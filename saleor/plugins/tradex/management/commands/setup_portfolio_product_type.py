@@ -58,6 +58,19 @@ class Command(BaseCommand):
                 entity_type="tradex.Operation",  # Reference to our Operation model
             )
 
+            # Create holdings reference attribute
+            self.stdout.write('Creating holdings reference attribute...')
+            holdings_attr = Attribute.objects.create(
+                slug="holdings",
+                name="Holdings",
+                type=AttributeType.PRODUCT_TYPE,
+                input_type=AttributeInputType.REFERENCE,
+                value_required=False,
+                visible_in_storefront=True,
+                filterable_in_dashboard=True,
+                entity_type="tradex.Holding",  # Reference to our Holding model
+            )
+
             # Create portfolio management attributes
             self.stdout.write('Creating portfolio management attributes...')
             
@@ -174,6 +187,7 @@ class Command(BaseCommand):
             self.stdout.write('Assigning attributes to Portfolio product type...')
             portfolio_product_type.product_attributes.add(
                 operation_attr,
+                holdings_attr,
                 portfolio_name_attr,
                 portfolio_type_attr,
                 base_currency_attr,

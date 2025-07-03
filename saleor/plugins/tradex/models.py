@@ -103,3 +103,71 @@ class Operation(models.Model):
     def net_value(self):
         """Calculate net value excluding fees."""
         return self.amount * self.price
+
+
+class Holding(models.Model):
+    """
+    Model to store portfolio holdings data.
+    This represents individual holdings within a portfolio.
+    """
+    
+    # Unique identifier for the holding
+    id = models.CharField(
+        max_length=100,
+        primary_key=True,
+        help_text="Unique identifier for the holding"
+    )
+    
+    # Amount/quantity - non-negative integer
+    amount = models.PositiveIntegerField(
+        help_text="Amount or quantity of the holding (non-negative integer)"
+    )
+    
+    # Purchase price - non-negative numeric value
+    purchase_price = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Purchase price per unit (non-negative)"
+    )
+    
+    # Purchase timestamp
+    purchase_time = models.DateTimeField(
+        help_text="Date and time when the holding was purchased"
+    )
+    
+    # Market where the holding was purchased
+    market = models.CharField(
+        max_length=100,
+        help_text="Market or exchange where the holding was purchased"
+    )
+    
+    # Currency code (ISO 4217)
+    currency = models.CharField(
+        max_length=3,
+        help_text="Currency code (ISO 4217 format, e.g., USD, EUR)"
+    )
+    
+    # Metadata fields
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'tradex_holding'
+        ordering = ['-purchase_time', '-created_at']
+        indexes = [
+            models.Index(fields=['purchase_time']),
+            models.Index(fields=['market']),
+            models.Index(fields=['amount']),
+            models.Index(fields=['currency']),
+        ]
+        verbose_name = 'Portfolio Holding'
+        verbose_name_plural = 'Portfolio Holdings'
+    
+    def __str__(self):
+        return f"Holding {self.id}: {self.amount} @ {self.purchase_price} {self.currency} ({self.market})"
+    
+    @property
+    def total_value(self):
+        """Calculate total value of the holding."""
+        return self.amount * self.purchase_price
