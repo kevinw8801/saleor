@@ -55,13 +55,8 @@ class TradexPlugin(BasePlugin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Setup product types if auto-setup is enabled and plugin is active
-        if self.active:
-            config = self.get_plugin_configuration()
-            if config.get("auto_setup_utility_type", True):
-                self._setup_utility_product_type()
-            if config.get("auto_setup_portfolio_type", True):
-                self._setup_portfolio_product_type()
+        # Note: Don't run setup during initialization as it may cause DB issues
+        # Setup will be handled by management commands when needed
 
     def _setup_utility_product_type(self):
         """Setup the Utility product type with trading-specific attributes."""
