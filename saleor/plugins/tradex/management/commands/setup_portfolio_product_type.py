@@ -132,6 +132,17 @@ class Command(BaseCommand):
                     value=code,
                 )
 
+            # Cash balance attribute
+            cash_attr = Attribute.objects.create(
+                slug="cash",
+                name="Cash",
+                type=AttributeType.PRODUCT_TYPE,
+                input_type=AttributeInputType.NUMERIC,
+                value_required=False,
+                visible_in_storefront=True,
+                filterable_in_dashboard=True,
+            )
+
             # Risk level attribute
             risk_level_attr = Attribute.objects.create(
                 slug="risk-level",
@@ -166,6 +177,7 @@ class Command(BaseCommand):
                 portfolio_name_attr,
                 portfolio_type_attr,
                 base_currency_attr,
+                cash_attr,
                 risk_level_attr,
             )
 
