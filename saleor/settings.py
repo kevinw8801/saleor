@@ -317,6 +317,7 @@ INSTALLED_APPS = [
     "saleor.app",
     "saleor.thumbnail",
     "saleor.schedulers",
+    "saleor.plugins.tradex",
     # External apps
     "django_measurement",
     "mptt",
@@ -850,6 +851,7 @@ BUILTIN_PLUGINS = [
     "saleor.plugins.admin_email.plugin.AdminEmailPlugin",
     "saleor.plugins.sendgrid.plugin.SendgridEmailPlugin",
     "saleor.plugins.openid_connect.plugin.OpenIDConnectPlugin",
+    "saleor.plugins.tradex.plugin.TradexPlugin",
 ]
 
 # Plugin discovery
