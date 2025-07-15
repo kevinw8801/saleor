@@ -4,7 +4,7 @@ Configuration settings for Polygon integration
 Add these settings to your Django settings.py file:
 
 # Polygon.io API Configuration
-POLYGON_IO_API_KEY = os.environ.get('POLYGON_IO_API_KEY', None)
+POLYGON_IO_API_KEY = os.environ.get('POLYGON_IO_API_KEY', 'RNqYO8cU2YoeqIxLB3FJHtFzZCo2hCem')
 
 # Cache settings for financial data
 POLYGON_CACHE_SETTINGS = {
@@ -78,7 +78,7 @@ from django.conf import settings
 
 # Default configuration values
 DEFAULT_POLYGON_SETTINGS = {
-    'POLYGON_IO_API_KEY': None,
+    'POLYGON_IO_API_KEY': 'RNqYO8cU2YoeqIxLB3FJHtFzZCo2hCem',
     'POLYGON_CACHE_SETTINGS': {
         'QUOTE_CACHE_TIMEOUT': 60,
         'BARS_CACHE_TIMEOUT': 300,
@@ -141,7 +141,7 @@ def get_polygon_setting(setting_name: str, default_value=None):
 
 def get_api_key():
     """Get Polygon.io API key from settings or environment"""
-    return get_polygon_setting('POLYGON_IO_API_KEY') or os.environ.get('POLYGON_IO_API_KEY')
+    return get_polygon_setting('POLYGON_IO_API_KEY') or os.environ.get('POLYGON_IO_API_KEY', 'RNqYO8cU2YoeqIxLB3FJHtFzZCo2hCem')
 
 
 def get_cache_timeout(data_type: str):
