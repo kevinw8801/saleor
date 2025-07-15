@@ -853,6 +853,7 @@ BUILTIN_PLUGINS = [
     "saleor.plugins.sendgrid.plugin.SendgridEmailPlugin",
     "saleor.plugins.openid_connect.plugin.OpenIDConnectPlugin",
     "saleor.plugins.tradex.plugin.TradexPlugin",
+    "saleor.plugins.securities.plugin.SecuritiesPlugin",
 ]
 
 # Plugin discovery
