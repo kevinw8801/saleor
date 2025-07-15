@@ -674,3 +674,320 @@ def get_securities_statistics() -> Dict[str, Any]:
             'by_exchange': [],
             'by_sector': [],
         }
+
+
+def add_daily_price(
+    security_id: str,
+    date: str,  # YYYY-MM-DD format
+    open_price: float,
+    high_price: float,
+    low_price: float,
+    close_price: float,
+    volume: int,
+    adjusted_close: Optional[float] = None
+) -> bool:
+    """
+    Add daily price data for a security
+    
+    Args:
+        security_id: UUID of the security
+        date: Trading date in YYYY-MM-DD format
+        open_price: Opening price
+        high_price: Highest price
+        low_price: Lowest price
+        close_price: Closing price
+        volume: Trading volume
+        adjusted_close: Optional adjusted closing price
+        
+    Returns:
+        True if added successfully, False otherwise
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        from datetime import datetime
+        from decimal import Decimal
+        
+        security = Securities.objects.get(security_id=security_id)
+        date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Use update_or_create to handle duplicates
+        price_record, created = SecurityDailyPrices.objects.update_or_create(
+            security=security,
+            date=date_obj,
+            defaults={
+                'open_price': Decimal(str(open_price)),
+                'high_price': Decimal(str(high_price)),
+                'low_price': Decimal(str(low_price)),
+                'close_price': Decimal(str(close_price)),
+                'volume': volume,
+                'adjusted_close': Decimal(str(adjusted_close)) if adjusted_close else None,
+            }
+        )
+        return True
+    except Exception as e:
+        return False
+
+
+def get_latest_price(security_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get the latest price data for a security
+    
+    Args:
+        security_id: UUID of the security
+        
+    Returns:
+        Dictionary with latest price data or None
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        
+        security = Securities.objects.get(security_id=security_id)
+        latest_price = SecurityDailyPrices.objects.filter(
+            security=security
+        ).order_by('-date').first()
+        
+        if latest_price:
+            return {
+                'security_id': str(latest_price.security.security_id),
+                'symbol': latest_price.security.symbol,
+                'date': latest_price.date.isoformat(),
+                'open_price': float(latest_price.open_price),
+                'high_price': float(latest_price.high_price),
+                'low_price': float(latest_price.low_price),
+                'close_price': float(latest_price.close_price),
+                'adjusted_close': float(latest_price.adjusted_close) if latest_price.adjusted_close else None,
+                'volume': latest_price.volume,
+                'price_change': float(latest_price.price_change),
+                'price_change_percent': float(latest_price.price_change_percent),
+                'trading_range': float(latest_price.trading_range),
+            }
+        return None
+    except Exception:
+        return None
+
+
+def get_price_history(
+    security_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+) -> List[Dict[str, Any]]:
+    """
+    Get price history for a security
+    
+    Args:
+        security_id: UUID of the security
+        start_date: Start date in YYYY-MM-DD format (optional)
+        end_date: End date in YYYY-MM-DD format (optional)
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of price records
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        from datetime import datetime
+        
+        security = Securities.objects.get(security_id=security_id)
+        query = SecurityDailyPrices.objects.filter(security=security)
+        
+        if start_date:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(date__gte=start_date_obj)
+        
+        if end_date:
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(date__lte=end_date_obj)
+        
+        prices = query.order_by('-date')[:limit]
+        
+        return [
+            {
+                'date': price.date.isoformat(),
+                'open_price': float(price.open_price),
+                'high_price': float(price.high_price),
+                'low_price': float(price.low_price),
+                'close_price': float(price.close_price),
+                'adjusted_close': float(price.adjusted_close) if price.adjusted_close else None,
+                'volume': price.volume,
+                'price_change': float(price.price_change),
+                'price_change_percent': float(price.price_change_percent),
+            }
+            for price in prices
+        ]
+    except Exception:
+        return []
+
+
+def get_price_by_date(security_id: str, date: str) -> Optional[Dict[str, Any]]:
+    """
+    Get price data for a specific date
+    
+    Args:
+        security_id: UUID of the security
+        date: Date in YYYY-MM-DD format
+        
+    Returns:
+        Price data for the date or None
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        from datetime import datetime
+        
+        security = Securities.objects.get(security_id=security_id)
+        date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        price = SecurityDailyPrices.objects.filter(
+            security=security,
+            date=date_obj
+        ).first()
+        
+        if price:
+            return {
+                'date': price.date.isoformat(),
+                'open_price': float(price.open_price),
+                'high_price': float(price.high_price),
+                'low_price': float(price.low_price),
+                'close_price': float(price.close_price),
+                'adjusted_close': float(price.adjusted_close) if price.adjusted_close else None,
+                'volume': price.volume,
+                'price_change': float(price.price_change),
+                'price_change_percent': float(price.price_change_percent),
+            }
+        return None
+    except Exception:
+        return None
+
+
+def bulk_add_daily_prices(price_data: List[Dict[str, Any]]) -> Dict[str, int]:
+    """
+    Bulk add daily price data
+    
+    Args:
+        price_data: List of dictionaries with price data
+            Each dict should contain: security_id, date, open_price, high_price, 
+            low_price, close_price, volume, adjusted_close (optional)
+            
+    Returns:
+        Dictionary with success/error counts
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        from datetime import datetime
+        from decimal import Decimal
+        
+        success_count = 0
+        error_count = 0
+        
+        for data in price_data:
+            try:
+                security = Securities.objects.get(security_id=data['security_id'])
+                date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                
+                SecurityDailyPrices.objects.update_or_create(
+                    security=security,
+                    date=date_obj,
+                    defaults={
+                        'open_price': Decimal(str(data['open_price'])),
+                        'high_price': Decimal(str(data['high_price'])),
+                        'low_price': Decimal(str(data['low_price'])),
+                        'close_price': Decimal(str(data['close_price'])),
+                        'volume': data['volume'],
+                        'adjusted_close': Decimal(str(data['adjusted_close'])) if data.get('adjusted_close') else None,
+                    }
+                )
+                success_count += 1
+            except Exception:
+                error_count += 1
+        
+        return {
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_processed': len(price_data)
+        }
+    except Exception:
+        return {
+            'success_count': 0,
+            'error_count': len(price_data) if price_data else 0,
+            'total_processed': len(price_data) if price_data else 0
+        }
+
+
+def get_price_statistics(security_id: str, days: int = 30) -> Dict[str, Any]:
+    """
+    Get price statistics for a security over specified days
+    
+    Args:
+        security_id: UUID of the security
+        days: Number of days to analyze
+        
+    Returns:
+        Dictionary with price statistics
+    """
+    try:
+        from .models import Securities, SecurityDailyPrices
+        from datetime import datetime, timedelta
+        from django.db.models import Avg, Max, Min, Sum
+        
+        security = Securities.objects.get(security_id=security_id)
+        start_date = timezone.now().date() - timedelta(days=days)
+        
+        prices = SecurityDailyPrices.objects.filter(
+            security=security,
+            date__gte=start_date
+        )
+        
+        if not prices.exists():
+            return {
+                'symbol': security.symbol,
+                'period_days': days,
+                'trading_days': 0,
+                'statistics': {}
+            }
+        
+        stats = prices.aggregate(
+            avg_close=Avg('close_price'),
+            max_high=Max('high_price'),
+            min_low=Min('low_price'),
+            avg_volume=Avg('volume'),
+            total_volume=Sum('volume'),
+            max_volume=Max('volume'),
+            min_volume=Min('volume')
+        )
+        
+        latest_price = prices.order_by('-date').first()
+        earliest_price = prices.order_by('date').first()
+        
+        period_return = 0
+        if earliest_price and latest_price:
+            period_return = ((latest_price.close_price - earliest_price.close_price) / earliest_price.close_price) * 100
+        
+        return {
+            'symbol': security.symbol,
+            'period_days': days,
+            'trading_days': prices.count(),
+            'period_return_percent': float(period_return),
+            'statistics': {
+                'average_close_price': float(stats['avg_close'] or 0),
+                'highest_price': float(stats['max_high'] or 0),
+                'lowest_price': float(stats['min_low'] or 0),
+                'average_volume': int(stats['avg_volume'] or 0),
+                'total_volume': int(stats['total_volume'] or 0),
+                'max_volume': int(stats['max_volume'] or 0),
+                'min_volume': int(stats['min_volume'] or 0),
+            },
+            'latest_price': {
+                'date': latest_price.date.isoformat(),
+                'close_price': float(latest_price.close_price),
+                'volume': latest_price.volume
+            } if latest_price else None
+        }
+    except Exception:
+        return {
+            'symbol': 'Unknown',
+            'period_days': days,
+            'trading_days': 0,
+            'period_return_percent': 0,
+            'statistics': {},
+            'latest_price': None
+        }

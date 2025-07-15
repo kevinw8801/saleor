@@ -16,6 +16,12 @@ from .utils import (
     get_securities_by_type,
     update_security_market_data,
     get_securities_statistics,
+    add_daily_price,
+    get_latest_price,
+    get_price_history,
+    get_price_by_date,
+    bulk_add_daily_prices,
+    get_price_statistics,
 )
 
 if TYPE_CHECKING:
@@ -435,3 +441,58 @@ class SecuritiesPlugin(BasePlugin):
     def get_securities_stats(self) -> Dict[str, Any]:
         """Get securities database statistics"""
         return get_securities_statistics()
+
+    # Price Data API methods
+    def add_security_price(
+        self,
+        security_id: str,
+        date: str,
+        open_price: float,
+        high_price: float,
+        low_price: float,
+        close_price: float,
+        volume: int,
+        adjusted_close: Optional[float] = None
+    ) -> bool:
+        """Add daily price data for a security"""
+        return add_daily_price(
+            security_id=security_id,
+            date=date,
+            open_price=open_price,
+            high_price=high_price,
+            low_price=low_price,
+            close_price=close_price,
+            volume=volume,
+            adjusted_close=adjusted_close
+        )
+
+    def get_security_latest_price(self, security_id: str) -> Optional[Dict[str, Any]]:
+        """Get latest price data for a security"""
+        return get_latest_price(security_id)
+
+    def get_security_price_history(
+        self,
+        security_id: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Get price history for a security"""
+        return get_price_history(
+            security_id=security_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit
+        )
+
+    def get_security_price_by_date(self, security_id: str, date: str) -> Optional[Dict[str, Any]]:
+        """Get price data for a specific date"""
+        return get_price_by_date(security_id, date)
+
+    def bulk_add_security_prices(self, price_data: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Bulk add daily price data"""
+        return bulk_add_daily_prices(price_data)
+
+    def get_security_price_stats(self, security_id: str, days: int = 30) -> Dict[str, Any]:
+        """Get price statistics for a security"""
+        return get_price_statistics(security_id, days)

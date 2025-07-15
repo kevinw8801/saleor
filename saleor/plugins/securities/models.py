@@ -118,6 +118,106 @@ class Securities(models.Model):
         super().save(*args, **kwargs)
 
 
+class SecurityDailyPrices(models.Model):
+    """Daily price data for securities"""
+    
+    security = models.ForeignKey(
+        Securities,
+        on_delete=models.CASCADE,
+        related_name='daily_prices',
+        help_text="Reference to the security"
+    )
+    date = models.DateField(
+        help_text="Trading date"
+    )
+    close_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        help_text="Closing price for the day"
+    )
+    open_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        help_text="Opening price for the day"
+    )
+    high_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        help_text="Highest price for the day"
+    )
+    low_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        help_text="Lowest price for the day"
+    )
+    volume = models.BigIntegerField(
+        validators=[MinValueValidator(0)],
+        help_text="Trading volume for the day"
+    )
+    adjusted_close = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="Adjusted closing price (for splits, dividends, etc.)"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this price record was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When this price record was last updated"
+    )
+    
+    class Meta:
+        db_table = 'security_daily_prices'
+        verbose_name = 'Security Daily Price'
+        verbose_name_plural = 'Security Daily Prices'
+        unique_together = ['security', 'date']  # Composite primary key equivalent
+        ordering = ['-date', 'security__symbol']
+        indexes = [
+            models.Index(fields=['security', 'date']),
+            models.Index(fields=['date']),
+            models.Index(fields=['security', '-date']),  # For latest prices queries
+            models.Index(fields=['volume']),
+        ]
+    
+    def __str__(self):
+        return f"{self.security.symbol} - {self.date}: ${self.close_price}"
+    
+    @property
+    def price_change(self):
+        """Calculate price change from open to close"""
+        return self.close_price - self.open_price
+    
+    @property
+    def price_change_percent(self):
+        """Calculate percentage price change from open to close"""
+        if self.open_price > 0:
+            return ((self.close_price - self.open_price) / self.open_price) * 100
+        return 0
+    
+    @property
+    def trading_range(self):
+        """Calculate trading range (high - low)"""
+        return self.high_price - self.low_price
+    
+    def clean(self):
+        """Validate price data consistency"""
+        from django.core.exceptions import ValidationError
+        
+        if self.high_price < max(self.open_price, self.close_price, self.low_price):
+            raise ValidationError("High price must be >= open, close, and low prices")
+        
+        if self.low_price > min(self.open_price, self.close_price, self.high_price):
+            raise ValidationError("Low price must be <= open, close, and high prices")
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class SecuritiesMovement(models.Model):
     """Track all securities movements and changes"""
     
