@@ -10,6 +10,8 @@ from django.conf import settings
 from .clients import PolygonIOClient
 from .cache import CachedPolygonClient, PolygonCacheManager
 from .models import FinancialInstrument, StockData, OptionData, CryptoData, ForexData
+from .data_source import get_data_source_manager
+from .settings import should_use_websocket, get_data_source_setting
 
 
 class PolygonFinancialDataService:
@@ -18,15 +20,17 @@ class PolygonFinancialDataService:
     
     This service provides a clean interface for other Saleor components
     to access stock, options, crypto, and forex data from Polygon.io.
+    Uses configurable data sources (REST API or WebSocket) based on settings.
     """
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, 'POLYGON_IO_API_KEY', None)
         self._client = None
+        self._data_source_manager = None
     
     @property
     def client(self) -> CachedPolygonClient:
-        """Lazy-loaded cached Polygon.io client"""
+        """Lazy-loaded cached Polygon.io REST client (for backward compatibility)"""
         if self._client is None:
             if not self.api_key:
                 raise ValueError("Polygon.io API key not configured")
@@ -37,11 +41,18 @@ class PolygonFinancialDataService:
         
         return self._client
     
+    @property
+    def data_source_manager(self):
+        """Lazy-loaded data source manager"""
+        if self._data_source_manager is None:
+            self._data_source_manager = get_data_source_manager()
+        return self._data_source_manager
+    
     # Stock data methods
     def get_stock_price(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get current stock price"""
+        """Get current stock price using configured data source"""
         try:
-            data = self.client.get_stock_quote(symbol.upper())
+            data = self.data_source_manager.get_quote(symbol.upper(), 'stocks')
             if data and data.get('status') == 'OK':
                 return {
                     'symbol': symbol.upper(),
@@ -49,7 +60,8 @@ class PolygonFinancialDataService:
                     'bid': data.get('results', {}).get('b'),
                     'ask': data.get('results', {}).get('a'),
                     'volume': data.get('results', {}).get('v'),
-                    'timestamp': data.get('results', {}).get('t')
+                    'timestamp': data.get('results', {}).get('t'),
+                    'source': data.get('source', 'unknown')
                 }
         except Exception:
             pass
@@ -58,7 +70,7 @@ class PolygonFinancialDataService:
     def get_stock_historical_data(self, symbol: str, days: int = 30) -> List[Dict[str, Any]]:
         """Get historical stock data for specified number of days"""
         try:
-            data = self.client.get_stock_bars(symbol.upper(), timespan='day', limit=days)
+            data = self.data_source_manager.get_historical_data(symbol.upper(), 'day', limit=days, market_type='stocks')
             if data and data.get('status') == 'OK':
                 results = data.get('results', [])
                 return [
@@ -81,7 +93,7 @@ class PolygonFinancialDataService:
     def get_stock_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Get detailed stock information"""
         try:
-            data = self.client.get_stock_details(symbol.upper())
+            data = self.data_source_manager.get_details(symbol.upper(), 'stocks')
             if data and data.get('status') == 'OK':
                 results = data.get('results', {})
                 return {
@@ -102,9 +114,9 @@ class PolygonFinancialDataService:
     
     # Crypto data methods
     def get_crypto_price(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get current cryptocurrency price"""
+        """Get current cryptocurrency price using configured data source"""
         try:
-            data = self.client.get_crypto_quote(symbol.upper())
+            data = self.data_source_manager.get_quote(symbol.upper(), 'crypto')
             if data and data.get('status') == 'OK':
                 return {
                     'symbol': symbol.upper(),
@@ -112,7 +124,8 @@ class PolygonFinancialDataService:
                     'bid': data.get('results', {}).get('b'),
                     'ask': data.get('results', {}).get('a'),
                     'volume': data.get('results', {}).get('v'),
-                    'timestamp': data.get('results', {}).get('t')
+                    'timestamp': data.get('results', {}).get('t'),
+                    'source': data.get('source', 'unknown')
                 }
         except Exception:
             pass
@@ -121,7 +134,7 @@ class PolygonFinancialDataService:
     def get_crypto_historical_data(self, symbol: str, days: int = 30) -> List[Dict[str, Any]]:
         """Get historical crypto data"""
         try:
-            data = self.client.get_crypto_bars(symbol.upper(), timespan='day', limit=days)
+            data = self.data_source_manager.get_historical_data(symbol.upper(), 'day', limit=days, market_type='crypto')
             if data and data.get('status') == 'OK':
                 results = data.get('results', [])
                 return [
@@ -143,16 +156,17 @@ class PolygonFinancialDataService:
     
     # Forex data methods
     def get_forex_rate(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get current forex exchange rate"""
+        """Get current forex exchange rate using configured data source"""
         try:
-            data = self.client.get_forex_quote(symbol.upper())
+            data = self.data_source_manager.get_quote(symbol.upper(), 'forex')
             if data and data.get('status') == 'OK':
                 return {
                     'symbol': symbol.upper(),
                     'rate': data.get('results', {}).get('c'),
                     'bid': data.get('results', {}).get('b'),
                     'ask': data.get('results', {}).get('a'),
-                    'timestamp': data.get('results', {}).get('t')
+                    'timestamp': data.get('results', {}).get('t'),
+                    'source': data.get('source', 'unknown')
                 }
         except Exception:
             pass
@@ -161,7 +175,7 @@ class PolygonFinancialDataService:
     def get_forex_historical_data(self, symbol: str, days: int = 30) -> List[Dict[str, Any]]:
         """Get historical forex data"""
         try:
-            data = self.client.get_forex_bars(symbol.upper(), timespan='day', limit=days)
+            data = self.data_source_manager.get_historical_data(symbol.upper(), 'day', limit=days, market_type='forex')
             if data and data.get('status') == 'OK':
                 results = data.get('results', [])
                 return [
@@ -184,7 +198,7 @@ class PolygonFinancialDataService:
     def get_options_chain(self, underlying_symbol: str, expiration_date: str = None) -> List[Dict[str, Any]]:
         """Get options chain for underlying asset"""
         try:
-            data = self.client.get_options_chain(underlying_symbol.upper(), expiration_date)
+            data = self.data_source_manager.get_options_chain(underlying_symbol.upper(), expiration_date)
             if data and data.get('status') == 'OK':
                 results = data.get('results', [])
                 return [
@@ -204,8 +218,11 @@ class PolygonFinancialDataService:
         return []
     
     def get_option_price(self, option_ticker: str) -> Optional[Dict[str, Any]]:
-        """Get current option price"""
+        """Get current option price - note: options use REST API only"""
         try:
+            # Options quotes currently only available via REST API
+            if not self._rest_client:
+                return None
             data = self.client.get_option_quote(option_ticker.upper())
             if data and data.get('status') == 'OK':
                 return {
@@ -214,7 +231,8 @@ class PolygonFinancialDataService:
                     'ask': data.get('results', {}).get('a'),
                     'last': data.get('results', {}).get('c'),
                     'volume': data.get('results', {}).get('v'),
-                    'timestamp': data.get('results', {}).get('t')
+                    'timestamp': data.get('results', {}).get('t'),
+                    'source': 'rest'
                 }
         except Exception:
             pass
@@ -224,7 +242,7 @@ class PolygonFinancialDataService:
     def get_market_status(self) -> Optional[Dict[str, Any]]:
         """Get current market status"""
         try:
-            data = self.client.get_market_status()
+            data = self.data_source_manager.get_market_status()
             if data and data.get('status') == 'OK':
                 return data.get('results', {})
         except Exception:
@@ -234,7 +252,7 @@ class PolygonFinancialDataService:
     def search_instruments(self, query: str, market: str = None) -> List[Dict[str, Any]]:
         """Search for financial instruments"""
         try:
-            data = self.client.search_tickers(query, market)
+            data = self.data_source_manager.search_tickers(query, market)
             if data and data.get('status') == 'OK':
                 results = data.get('results', [])
                 return [
@@ -283,6 +301,26 @@ class PolygonFinancialDataService:
         except Exception:
             pass
         return False
+    
+    # WebSocket-specific methods
+    def subscribe_to_real_time_data(self, symbols: List[str], market_type: str = 'stocks', 
+                                   data_type: str = 'quotes') -> bool:
+        """Subscribe to real-time data via WebSocket"""
+        return self.data_source_manager.subscribe_to_real_time_data(symbols, market_type, data_type)
+    
+    def get_data_source_status(self) -> Dict[str, Any]:
+        """Get status of available data sources"""
+        return self.data_source_manager.get_data_source_status()
+    
+    def switch_data_source(self, primary_source: str) -> bool:
+        """Switch primary data source (requires app restart)"""
+        if primary_source not in ['rest', 'websocket']:
+            return False
+        
+        # This would typically update Django settings and require restart
+        # For now, just return status
+        current_status = self.get_data_source_status()
+        return current_status.get('primary_source') == primary_source
 
 
 # Global service instance for easy access
