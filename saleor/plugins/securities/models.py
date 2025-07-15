@@ -1,9 +1,121 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 
 from ...warehouse.models import Stock
 from .constants import SECURITIES_MOVEMENT_TYPES, NOTIFICATION_TYPES
+
+
+class Securities(models.Model):
+    """Master table for securities data (stocks, ETFs, bonds, etc.)"""
+    
+    SECURITY_TYPES = [
+        ('STOCK', 'Stock'),
+        ('ETF', 'ETF'),
+        ('MUTUAL_FUND', 'Mutual Fund'),
+        ('BOND', 'Bond'),
+        ('OPTION', 'Option'),
+        ('FUTURE', 'Future'),
+        ('CRYPTO', 'Cryptocurrency'),
+        ('FOREX', 'Forex'),
+        ('COMMODITY', 'Commodity'),
+        ('INDEX', 'Index'),
+    ]
+    
+    security_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Unique identifier for the security"
+    )
+    symbol = models.CharField(
+        max_length=16,
+        help_text="Trading symbol for the security"
+    )
+    security_type = models.CharField(
+        max_length=12,
+        choices=SECURITY_TYPES,
+        help_text="Type of security (stock, ETF, etc.)"
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text="Full name of the security"
+    )
+    exchange = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Exchange where the security is traded"
+    )
+    currency = models.CharField(
+        max_length=3,
+        default='USD',
+        help_text="Currency of the security"
+    )
+    sector = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Business sector"
+    )
+    industry = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Industry classification"
+    )
+    country = models.CharField(
+        max_length=3,
+        blank=True,
+        help_text="Country code (ISO 3166-1 alpha-3)"
+    )
+    market_cap = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Market capitalization in base currency"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of the security"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether the security is actively traded"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the security record was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When the security record was last updated"
+    )
+    
+    class Meta:
+        db_table = 'securities'
+        verbose_name = 'Security'
+        verbose_name_plural = 'Securities'
+        unique_together = ['symbol', 'security_type']
+        indexes = [
+            models.Index(fields=['symbol']),
+            models.Index(fields=['security_type']),
+            models.Index(fields=['exchange']),
+            models.Index(fields=['sector']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['symbol']
+    
+    def __str__(self):
+        return f"{self.symbol} ({self.security_type}) - {self.name}"
+    
+    @property
+    def display_name(self):
+        """Display name combining symbol and name"""
+        return f"{self.symbol} - {self.name}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure symbol is uppercase
+        self.symbol = self.symbol.upper()
+        super().save(*args, **kwargs)
 
 
 class SecuritiesMovement(models.Model):

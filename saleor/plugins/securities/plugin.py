@@ -10,6 +10,12 @@ from .utils import (
     check_low_securities_threshold,
     generate_securities_report,
     predict_securities_needs,
+    create_security,
+    get_security_by_symbol,
+    search_securities,
+    get_securities_by_type,
+    update_security_market_data,
+    get_securities_statistics,
 )
 
 if TYPE_CHECKING:
@@ -301,3 +307,131 @@ class SecuritiesPlugin(BasePlugin):
             return True
         except Exception:
             return False
+
+    # Securities Master Data API methods
+    def create_security_record(
+        self,
+        symbol: str,
+        security_type: str,
+        name: str,
+        exchange: str = '',
+        currency: str = 'USD',
+        sector: str = '',
+        industry: str = '',
+        country: str = '',
+        market_cap: Optional[int] = None,
+        description: str = ''
+    ) -> Optional[str]:
+        """Create a new security record"""
+        try:
+            security = create_security(
+                symbol=symbol,
+                security_type=security_type,
+                name=name,
+                exchange=exchange,
+                currency=currency,
+                sector=sector,
+                industry=industry,
+                country=country,
+                market_cap=market_cap,
+                description=description
+            )
+            return str(security.security_id)
+        except Exception:
+            return None
+
+    def get_security(self, symbol: str, security_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get security by symbol"""
+        security = get_security_by_symbol(symbol, security_type)
+        if security:
+            return {
+                'security_id': str(security.security_id),
+                'symbol': security.symbol,
+                'security_type': security.security_type,
+                'name': security.name,
+                'exchange': security.exchange,
+                'currency': security.currency,
+                'sector': security.sector,
+                'industry': security.industry,
+                'country': security.country,
+                'market_cap': security.market_cap,
+                'description': security.description,
+                'is_active': security.is_active,
+                'created_at': security.created_at.isoformat(),
+                'updated_at': security.updated_at.isoformat(),
+            }
+        return None
+
+    def search_securities_records(
+        self,
+        symbol_contains: Optional[str] = None,
+        name_contains: Optional[str] = None,
+        security_type: Optional[str] = None,
+        exchange: Optional[str] = None,
+        sector: Optional[str] = None,
+        is_active: bool = True,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Search securities with filters"""
+        securities = search_securities(
+            symbol_contains=symbol_contains,
+            name_contains=name_contains,
+            security_type=security_type,
+            exchange=exchange,
+            sector=sector,
+            is_active=is_active,
+            limit=limit
+        )
+        
+        return [
+            {
+                'security_id': str(security.security_id),
+                'symbol': security.symbol,
+                'security_type': security.security_type,
+                'name': security.name,
+                'exchange': security.exchange,
+                'currency': security.currency,
+                'sector': security.sector,
+                'industry': security.industry,
+                'is_active': security.is_active,
+            }
+            for security in securities
+        ]
+
+    def get_securities_by_type_api(self, security_type: str, is_active: bool = True) -> List[Dict[str, Any]]:
+        """Get securities by type"""
+        securities = get_securities_by_type(security_type, is_active)
+        
+        return [
+            {
+                'security_id': str(security.security_id),
+                'symbol': security.symbol,
+                'name': security.name,
+                'exchange': security.exchange,
+                'currency': security.currency,
+                'sector': security.sector,
+                'industry': security.industry,
+            }
+            for security in securities
+        ]
+
+    def update_security_data(
+        self,
+        security_id: str,
+        market_cap: Optional[int] = None,
+        sector: Optional[str] = None,
+        industry: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> bool:
+        """Update security market data"""
+        return update_security_market_data(
+            security_id=security_id,
+            market_cap=market_cap,
+            sector=sector,
+            industry=industry,
+            description=description
+        )
+
+    def get_securities_stats(self) -> Dict[str, Any]:
+        """Get securities database statistics"""
+        return get_securities_statistics()

@@ -446,3 +446,231 @@ def check_expiring_securities(days_ahead: int = 7) -> List[Dict[str, Any]]:
         
     except Exception:
         return []
+
+
+def create_security(
+    symbol: str,
+    security_type: str,
+    name: str,
+    exchange: str = '',
+    currency: str = 'USD',
+    sector: str = '',
+    industry: str = '',
+    country: str = '',
+    market_cap: Optional[int] = None,
+    description: str = ''
+) -> 'Securities':
+    """
+    Create a new security record
+    
+    Args:
+        symbol: Trading symbol
+        security_type: Type of security (STOCK, ETF, etc.)
+        name: Full name of the security
+        exchange: Exchange where traded
+        currency: Currency code
+        sector: Business sector
+        industry: Industry classification
+        country: Country code
+        market_cap: Market capitalization
+        description: Security description
+        
+    Returns:
+        Created Securities instance
+    """
+    try:
+        from .models import Securities
+        
+        security = Securities.objects.create(
+            symbol=symbol.upper(),
+            security_type=security_type,
+            name=name,
+            exchange=exchange,
+            currency=currency,
+            sector=sector,
+            industry=industry,
+            country=country,
+            market_cap=market_cap,
+            description=description
+        )
+        return security
+    except Exception as e:
+        raise ValueError(f"Failed to create security: {str(e)}")
+
+
+def get_security_by_symbol(symbol: str, security_type: Optional[str] = None) -> Optional['Securities']:
+    """
+    Get security by symbol and optionally by type
+    
+    Args:
+        symbol: Trading symbol
+        security_type: Optional security type filter
+        
+    Returns:
+        Securities instance if found, None otherwise
+    """
+    try:
+        from .models import Securities
+        
+        query = Securities.objects.filter(symbol=symbol.upper())
+        if security_type:
+            query = query.filter(security_type=security_type)
+            
+        return query.first()
+    except Exception:
+        return None
+
+
+def search_securities(
+    symbol_contains: Optional[str] = None,
+    name_contains: Optional[str] = None,
+    security_type: Optional[str] = None,
+    exchange: Optional[str] = None,
+    sector: Optional[str] = None,
+    is_active: bool = True,
+    limit: int = 100
+) -> List['Securities']:
+    """
+    Search securities with various filters
+    
+    Args:
+        symbol_contains: Symbol contains text
+        name_contains: Name contains text
+        security_type: Security type filter
+        exchange: Exchange filter
+        sector: Sector filter
+        is_active: Active status filter
+        limit: Maximum results to return
+        
+    Returns:
+        List of matching Securities instances
+    """
+    try:
+        from .models import Securities
+        
+        query = Securities.objects.filter(is_active=is_active)
+        
+        if symbol_contains:
+            query = query.filter(symbol__icontains=symbol_contains)
+        if name_contains:
+            query = query.filter(name__icontains=name_contains)
+        if security_type:
+            query = query.filter(security_type=security_type)
+        if exchange:
+            query = query.filter(exchange=exchange)
+        if sector:
+            query = query.filter(sector=sector)
+            
+        return list(query.order_by('symbol')[:limit])
+    except Exception:
+        return []
+
+
+def get_securities_by_type(security_type: str, is_active: bool = True) -> List['Securities']:
+    """
+    Get all securities of a specific type
+    
+    Args:
+        security_type: Type of security (STOCK, ETF, etc.)
+        is_active: Filter by active status
+        
+    Returns:
+        List of Securities instances
+    """
+    try:
+        from .models import Securities
+        
+        return list(Securities.objects.filter(
+            security_type=security_type,
+            is_active=is_active
+        ).order_by('symbol'))
+    except Exception:
+        return []
+
+
+def update_security_market_data(
+    security_id: str,
+    market_cap: Optional[int] = None,
+    sector: Optional[str] = None,
+    industry: Optional[str] = None,
+    description: Optional[str] = None
+) -> bool:
+    """
+    Update market data for a security
+    
+    Args:
+        security_id: UUID of the security
+        market_cap: Market capitalization
+        sector: Business sector
+        industry: Industry classification
+        description: Security description
+        
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    try:
+        from .models import Securities
+        
+        security = Securities.objects.get(security_id=security_id)
+        
+        if market_cap is not None:
+            security.market_cap = market_cap
+        if sector is not None:
+            security.sector = sector
+        if industry is not None:
+            security.industry = industry
+        if description is not None:
+            security.description = description
+            
+        security.save()
+        return True
+    except Exception:
+        return False
+
+
+def get_securities_statistics() -> Dict[str, Any]:
+    """
+    Get statistics about securities in the database
+    
+    Returns:
+        Dictionary with securities statistics
+    """
+    try:
+        from .models import Securities
+        from django.db.models import Count
+        
+        total_securities = Securities.objects.count()
+        active_securities = Securities.objects.filter(is_active=True).count()
+        
+        # Statistics by type
+        by_type = Securities.objects.values('security_type').annotate(
+            count=Count('security_id')
+        ).order_by('security_type')
+        
+        # Statistics by exchange
+        by_exchange = Securities.objects.exclude(exchange='').values('exchange').annotate(
+            count=Count('security_id')
+        ).order_by('-count')[:10]
+        
+        # Statistics by sector
+        by_sector = Securities.objects.exclude(sector='').values('sector').annotate(
+            count=Count('security_id')
+        ).order_by('-count')[:10]
+        
+        return {
+            'total_securities': total_securities,
+            'active_securities': active_securities,
+            'inactive_securities': total_securities - active_securities,
+            'by_type': list(by_type),
+            'by_exchange': list(by_exchange),
+            'by_sector': list(by_sector),
+        }
+    except Exception:
+        return {
+            'total_securities': 0,
+            'active_securities': 0,
+            'inactive_securities': 0,
+            'by_type': [],
+            'by_exchange': [],
+            'by_sector': [],
+        }
