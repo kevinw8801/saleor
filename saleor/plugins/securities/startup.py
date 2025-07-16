@@ -60,11 +60,21 @@ def initialize_tickers_data():
         
         if not tickers_data:
             logger.warning("No ticker data retrieved from Polygon.io")
+            logger.info("This may be due to rate limiting. Try again later or upgrade your Polygon.io plan.")
             return
         
         # Bulk insert tickers
         inserted_count = bulk_insert_tickers(tickers_data)
-        logger.info(f"Successfully inserted {inserted_count} tickers")
+        final_count = inserted_count
+        
+        if inserted_count > 0:
+            logger.info(f"Successfully inserted {inserted_count} tickers from Polygon.io")
+            logger.info(f"Ticker initialization completed. Database now contains ticker data.")
+            if inserted_count < 5000:
+                logger.info("Note: Due to API rate limits, this may be a partial dataset.")
+                logger.info("Run the initialization again later to fetch more tickers, or upgrade your Polygon.io plan.")
+        else:
+            logger.warning("No new tickers were inserted (may be duplicates or empty dataset)")
         
     except Exception as e:
         logger.error(f"Error initializing tickers data: {e}")
@@ -73,15 +83,24 @@ def initialize_tickers_data():
 def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     """
     Fetch US stocks and ETFs from Polygon.io v3/reference/tickers endpoint.
+    Uses rate limiting and handles API errors gracefully.
     
     Returns:
         List of ticker dictionaries with required fields
     """
     tickers_data = []
     next_url = None
+    request_count = 0
+    max_requests = 5  # Limit for free tier (5 requests per minute)
     
     try:
         while True:
+            # Rate limiting check
+            if request_count >= max_requests:
+                logger.warning(f"Reached rate limit of {max_requests} requests. Stopping ticker fetch to avoid 429 errors.")
+                logger.info("For more data, consider upgrading Polygon.io plan or running this process during off-peak hours.")
+                break
+            
             # Prepare request parameters
             params = {
                 'market': 'stocks',  # US stocks market
@@ -89,12 +108,24 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                 'limit': 1000  # Maximum allowed per request
             }
             
-            # Make API request
-            if next_url:
-                # Use cursor-based pagination
-                response = polygon_client._make_request(next_url.replace(polygon_client.BASE_URL, ''))
-            else:
-                response = polygon_client._make_request('/v3/reference/tickers', params)
+            try:
+                # Make API request with error handling
+                if next_url:
+                    # Use cursor-based pagination
+                    response = polygon_client._make_request(next_url.replace(polygon_client.BASE_URL, ''))
+                else:
+                    response = polygon_client._make_request('/v3/reference/tickers', params)
+                
+                request_count += 1
+                
+            except Exception as api_error:
+                if "429" in str(api_error) or "Too Many Requests" in str(api_error):
+                    logger.warning("Hit rate limit (429). Stopping fetch to avoid further rate limiting.")
+                    logger.info(f"Successfully fetched {len(tickers_data)} tickers before hitting rate limit.")
+                    break
+                else:
+                    logger.error(f"API request failed: {api_error}")
+                    break
             
             # Process response
             if response.get('status') == 'OK' and 'results' in response:
@@ -119,14 +150,17 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                         if processed_ticker['ticker'] and len(processed_ticker['ticker']) <= 10:
                             tickers_data.append(processed_ticker)
                 
+                logger.info(f"Processed page {request_count}, got {len(results)} tickers. Total so far: {len(tickers_data)}")
+                
                 # Check for pagination
                 next_url = response.get('next_url')
                 if not next_url:
+                    logger.info("No more pages to fetch.")
                     break
                     
-                # Add small delay to respect rate limits
+                # Add delay to respect rate limits (free tier: 5 requests per minute)
                 import time
-                time.sleep(0.1)
+                time.sleep(12)  # 12 seconds between requests = 5 requests per minute
                 
             else:
                 logger.error(f"Invalid response from Polygon.io: {response}")
@@ -135,7 +169,9 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error fetching tickers from Polygon.io: {e}")
     
-    logger.info(f"Fetched {len(tickers_data)} tickers from Polygon.io")
+    logger.info(f"Finished fetching. Total tickers collected: {len(tickers_data)}")
+    logger.info(f"Made {request_count} API requests")
+    
     return tickers_data
 
 
