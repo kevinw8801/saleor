@@ -18,7 +18,7 @@ def initialize_tickers_data():
     try:
         # Import here to avoid circular imports
         from ...polygon.clients import PolygonIOClient
-        from .models import Tickers
+        from ...polygon.models import Tickers
         
         # Check current ticker count
         ticker_count = Tickers.objects.count()
@@ -136,7 +136,7 @@ def bulk_insert_tickers(tickers_data: List[Dict[str, Any]]) -> int:
     
     try:
         # Import here to avoid circular imports
-        from .models import Tickers
+        from ...polygon.models import Tickers
         
         with transaction.atomic():
             # Create ticker objects
