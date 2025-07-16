@@ -11,14 +11,30 @@ def initialize_tickers_data():
     Initialize tickers data from Polygon.io API on startup.
     
     This function:
-    1. Checks the number of records in the tickers table
-    2. If count > 5000, does nothing
-    3. Otherwise, fetches US stocks and ETFs from Polygon.io and populates the table
+    1. Checks if the tickers table exists
+    2. Checks the number of records in the tickers table
+    3. If count > 5000, does nothing
+    4. Otherwise, fetches US stocks and ETFs from Polygon.io and populates the table
     """
     try:
         # Import here to avoid circular imports
+        from django.db import connection
         from ...polygon.clients import PolygonIOClient
         from ...polygon.models import Tickers
+        
+        # Check if tickers table exists
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'tickers'
+                );
+            """)
+            table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            logger.info("Tickers table does not exist yet, skipping initialization. Will retry on next startup.")
+            return
         
         # Check current ticker count
         ticker_count = Tickers.objects.count()
