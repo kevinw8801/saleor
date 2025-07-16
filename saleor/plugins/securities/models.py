@@ -7,6 +7,62 @@ from ...warehouse.models import Stock
 from .constants import SECURITIES_MOVEMENT_TYPES, NOTIFICATION_TYPES
 
 
+class Tickers(models.Model):
+    """Ticker symbols and metadata for securities"""
+    
+    TICKER_TYPES = [
+        ('cs', 'Common Stock'),
+        ('etp', 'Exchange Traded Product'),
+    ]
+    
+    ticker = models.CharField(
+        max_length=10,
+        primary_key=True,
+        help_text="Ticker symbol (e.g., AAPL, SPY)"
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text="Company/fund name"
+    )
+    type = models.CharField(
+        max_length=10,
+        choices=TICKER_TYPES,
+        help_text="Type of security - 'cs' for stock, 'etp' for ETF"
+    )
+    exchange = models.CharField(
+        max_length=10,
+        help_text="Exchange where the ticker is traded"
+    )
+    active = models.BooleanField(
+        default=True,
+        help_text="Whether the ticker is actively traded"
+    )
+    last_updated = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of last update"
+    )
+    
+    class Meta:
+        db_table = 'tickers'
+        verbose_name = 'Ticker'
+        verbose_name_plural = 'Tickers'
+        indexes = [
+            models.Index(fields=['ticker', 'name'], name='idx_ticker_search'),
+            models.Index(fields=['type']),
+            models.Index(fields=['exchange']),
+            models.Index(fields=['active']),
+        ]
+        ordering = ['ticker']
+    
+    def __str__(self):
+        return f"{self.ticker} - {self.name}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure ticker is uppercase
+        self.ticker = self.ticker.upper()
+        super().save(*args, **kwargs)
+
+
 class Securities(models.Model):
     """Master table for securities data (stocks, ETFs, bonds, etc.)"""
     
