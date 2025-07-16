@@ -1,6 +1,5 @@
-# Generated manually for securities plugin
+# Generated manually for securities plugin - inventory management models only
 
-import uuid
 import django.core.validators
 from django.db import migrations, models
 import django.db.models.deletion
@@ -12,35 +11,10 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('warehouse', '0001_initial'),  # Assuming warehouse app exists
+        ('warehouse', '0001_initial'),  # Depends on warehouse app
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Securities',
-            fields=[
-                ('security_id', models.UUIDField(default=uuid.uuid4, editable=False, help_text='Unique identifier for the security', primary_key=True, serialize=False)),
-                ('symbol', models.CharField(help_text='Trading symbol for the security', max_length=16)),
-                ('security_type', models.CharField(choices=[('STOCK', 'Stock'), ('ETF', 'ETF'), ('MUTUAL_FUND', 'Mutual Fund'), ('BOND', 'Bond'), ('OPTION', 'Option'), ('FUTURE', 'Future'), ('CRYPTO', 'Cryptocurrency'), ('FOREX', 'Forex'), ('COMMODITY', 'Commodity'), ('INDEX', 'Index')], help_text='Type of security (stock, ETF, etc.)', max_length=12)),
-                ('name', models.CharField(help_text='Full name of the security', max_length=255)),
-                ('exchange', models.CharField(blank=True, help_text='Exchange where the security is traded', max_length=10)),
-                ('currency', models.CharField(default='USD', help_text='Currency of the security', max_length=3)),
-                ('sector', models.CharField(blank=True, help_text='Business sector', max_length=50)),
-                ('industry', models.CharField(blank=True, help_text='Industry classification', max_length=50)),
-                ('country', models.CharField(blank=True, help_text='Country code (ISO 3166-1 alpha-3)', max_length=3)),
-                ('market_cap', models.BigIntegerField(blank=True, help_text='Market capitalization in base currency', null=True)),
-                ('description', models.TextField(blank=True, help_text='Description of the security')),
-                ('is_active', models.BooleanField(default=True, help_text='Whether the security is actively traded')),
-                ('created_at', models.DateTimeField(auto_now_add=True, help_text='When the security record was created')),
-                ('updated_at', models.DateTimeField(auto_now=True, help_text='When the security record was last updated')),
-            ],
-            options={
-                'verbose_name': 'Security',
-                'verbose_name_plural': 'Securities',
-                'db_table': 'securities',
-                'ordering': ['symbol'],
-            },
-        ),
         migrations.CreateModel(
             name='SecuritiesAlert',
             fields=[
@@ -153,30 +127,7 @@ class Migration(migrations.Migration):
                 'ordering': ['-created_at'],
             },
         ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['symbol'], name='securities_symbol_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['security_type'], name='securities_security_type_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['exchange'], name='securities_exchange_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['sector'], name='securities_sector_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['is_active'], name='securities_is_active_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securities',
-            index=models.Index(fields=['created_at'], name='securities_created_at_idx'),
-        ),
+        # Add indexes
         migrations.AddIndex(
             model_name='securitiesalert',
             index=models.Index(fields=['stock', 'alert_type'], name='securities_alert_stock_alert_type_idx'),
@@ -217,10 +168,7 @@ class Migration(migrations.Migration):
             model_name='reordersuggestion',
             index=models.Index(fields=['urgency_level', 'created_at'], name='securities_reorder_suggestion_urgency_level_created_at_idx'),
         ),
-        migrations.AlterUniqueTogether(
-            name='securities',
-            unique_together={('symbol', 'security_type')},
-        ),
+        # Add unique constraints
         migrations.AlterUniqueTogether(
             name='securitiesbatch',
             unique_together={('stock', 'batch_number')},
