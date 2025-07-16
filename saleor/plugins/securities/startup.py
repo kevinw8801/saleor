@@ -56,7 +56,15 @@ def initialize_tickers_data():
             return
         
         # Fetch US stocks and ETFs
-        tickers_data = fetch_us_stocks_and_etfs(polygon_client)
+        logger.info("Fetching US stocks and ETFs from Polygon.io...")
+        stocks_and_etfs_data = fetch_us_stocks_and_etfs(polygon_client)
+        
+        # Also fetch ETFs specifically to ensure comprehensive coverage
+        logger.info("Fetching additional ETF data from Polygon.io...")
+        etf_data = fetch_us_etfs_specifically(polygon_client)
+        
+        # Combine data and remove duplicates
+        tickers_data = combine_and_deduplicate_tickers(stocks_and_etfs_data, etf_data)
         
         if not tickers_data:
             logger.warning("No ticker data retrieved from Polygon.io")
@@ -68,8 +76,16 @@ def initialize_tickers_data():
         final_count = inserted_count
         
         if inserted_count > 0:
-            logger.info(f"Successfully inserted {inserted_count} tickers from Polygon.io")
-            logger.info(f"Ticker initialization completed. Database now contains ticker data.")
+            # Count final results by type
+            from ...polygon.models import Tickers
+            total_tickers = Tickers.objects.count()
+            stocks_count = Tickers.objects.filter(type='cs').count()
+            etfs_count = Tickers.objects.filter(type='etp').count()
+            
+            logger.info(f"Successfully inserted {inserted_count} new tickers from Polygon.io")
+            logger.info(f"Database now contains {total_tickers} total tickers: {stocks_count} stocks, {etfs_count} ETFs")
+            logger.info("Ticker initialization completed with comprehensive US market coverage.")
+            
             if inserted_count < 5000:
                 logger.info("Note: Due to API rate limits, this may be a partial dataset.")
                 logger.info("Run the initialization again later to fetch more tickers, or upgrade your Polygon.io plan.")
@@ -173,6 +189,129 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     logger.info(f"Made {request_count} API requests")
     
     return tickers_data
+
+
+def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
+    """
+    Fetch US ETFs specifically from Polygon.io v3/reference/tickers endpoint.
+    This makes a targeted call for ETFs to ensure comprehensive coverage.
+    
+    Returns:
+        List of ETF ticker dictionaries
+    """
+    etf_data = []
+    next_url = None
+    request_count = 0
+    max_requests = 3  # Limit requests for ETF-specific call
+    
+    try:
+        while True:
+            # Rate limiting check
+            if request_count >= max_requests:
+                logger.info(f"Reached ETF request limit of {max_requests}. Collected {len(etf_data)} ETFs.")
+                break
+            
+            # Prepare request parameters specifically for ETFs
+            params = {
+                'market': 'stocks',  # US stocks market includes ETFs
+                'type': 'ETP',       # Exchange Traded Products (ETFs)
+                'active': 'true',
+                'limit': 1000
+            }
+            
+            try:
+                # Make API request
+                if next_url:
+                    response = polygon_client._make_request(next_url.replace(polygon_client.BASE_URL, ''))
+                else:
+                    response = polygon_client._make_request('/v3/reference/tickers', params)
+                
+                request_count += 1
+                
+            except Exception as api_error:
+                if "429" in str(api_error) or "Too Many Requests" in str(api_error):
+                    logger.warning("Hit rate limit during ETF fetch. Stopping ETF-specific fetch.")
+                    break
+                else:
+                    logger.error(f"ETF API request failed: {api_error}")
+                    break
+            
+            # Process response
+            if response.get('status') == 'OK' and 'results' in response:
+                results = response['results']
+                
+                for ticker_data in results:
+                    # Filter for US ETFs only
+                    ticker_type = ticker_data.get('type')
+                    market = ticker_data.get('market', '').lower()
+                    
+                    # Only include Exchange Traded Products
+                    if ticker_type == 'ETP' and market == 'stocks':
+                        processed_ticker = {
+                            'ticker': ticker_data.get('ticker', '').upper(),
+                            'name': ticker_data.get('name', '')[:255],
+                            'type': 'etp',
+                            'exchange': ticker_data.get('primary_exchange', '')[:10],
+                            'active': ticker_data.get('active', True)
+                        }
+                        
+                        # Only add if ticker symbol is valid
+                        if processed_ticker['ticker'] and len(processed_ticker['ticker']) <= 10:
+                            etf_data.append(processed_ticker)
+                
+                logger.info(f"ETF page {request_count}, got {len(results)} results. ETFs collected: {len(etf_data)}")
+                
+                # Check for pagination
+                next_url = response.get('next_url')
+                if not next_url:
+                    break
+                    
+                # Add delay to respect rate limits
+                import time
+                time.sleep(12)
+                
+            else:
+                logger.error(f"Invalid ETF response from Polygon.io: {response}")
+                break
+                
+    except Exception as e:
+        logger.error(f"Error fetching ETFs from Polygon.io: {e}")
+    
+    logger.info(f"ETF-specific fetch completed. Total ETFs collected: {len(etf_data)}")
+    return etf_data
+
+
+def combine_and_deduplicate_tickers(stocks_and_etfs: List[Dict[str, Any]], etfs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Combine ticker data from multiple sources and remove duplicates.
+    
+    Args:
+        stocks_and_etfs: Data from general stocks/ETFs fetch
+        etfs: Data from ETF-specific fetch
+        
+    Returns:
+        Combined and deduplicated list of tickers
+    """
+    # Use a dictionary to deduplicate by ticker symbol
+    ticker_dict = {}
+    
+    # Add stocks and ETFs from general fetch
+    for ticker in stocks_and_etfs:
+        ticker_dict[ticker['ticker']] = ticker
+    
+    # Add ETFs from specific fetch (will overwrite if duplicate, ensuring we have latest data)
+    for ticker in etfs:
+        ticker_dict[ticker['ticker']] = ticker
+    
+    combined_data = list(ticker_dict.values())
+    
+    # Count by type for logging
+    stocks_count = sum(1 for t in combined_data if t['type'] == 'cs')
+    etfs_count = sum(1 for t in combined_data if t['type'] == 'etp')
+    
+    logger.info(f"Combined ticker data: {stocks_count} stocks, {etfs_count} ETFs, {len(combined_data)} total")
+    
+    return combined_data
 
 
 def bulk_insert_tickers(tickers_data: List[Dict[str, Any]]) -> int:
