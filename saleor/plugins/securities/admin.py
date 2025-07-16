@@ -4,8 +4,7 @@ from django.utils.html import format_html
 from django.utils import timezone
 
 from .models import (
-    Securities,
-    SecurityDailyPrices,
+    Tickers,
     SecuritiesMovement,
     SecuritiesAlert,
     SecuritiesSettings,
@@ -15,184 +14,57 @@ from .models import (
 )
 
 
-@admin.register(Securities)
-class SecuritiesAdmin(admin.ModelAdmin):
+@admin.register(Tickers)
+class TickersAdmin(admin.ModelAdmin):
     list_display = (
-        'symbol',
-        'security_type',
+        'ticker',
         'name',
+        'type',
         'exchange',
-        'currency',
-        'sector',
-        'industry',
-        'is_active',
-        'created_at'
+        'active',
+        'last_updated'
     )
     list_filter = (
-        'security_type',
+        'type',
         'exchange',
-        'currency',
-        'sector',
-        'industry',
-        'is_active',
-        'created_at'
+        'active',
+        'last_updated'
     )
     search_fields = (
-        'symbol',
+        'ticker',
         'name',
-        'description',
-        'sector',
-        'industry'
+        'exchange'
     )
     readonly_fields = (
-        'security_id',
-        'created_at',
-        'updated_at'
+        'last_updated',
     )
-    ordering = ('symbol',)
+    ordering = ('ticker',)
     list_per_page = 50
     
     fieldsets = (
         ('Basic Information', {
             'fields': (
-                'security_id',
-                'symbol',
-                'security_type',
+                'ticker',
                 'name',
-                'description'
+                'type'
             )
         }),
         ('Trading Information', {
             'fields': (
                 'exchange',
-                'currency',
-                'is_active'
-            )
-        }),
-        ('Classification', {
-            'fields': (
-                'sector',
-                'industry',
-                'country'
-            )
-        }),
-        ('Financial Data', {
-            'fields': (
-                'market_cap',
+                'active'
             )
         }),
         ('Timestamps', {
             'fields': (
-                'created_at',
-                'updated_at'
+                'last_updated',
             ),
             'classes': ('collapse',)
         })
     )
     
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related()
-
-
-@admin.register(SecurityDailyPrices)
-class SecurityDailyPricesAdmin(admin.ModelAdmin):
-    list_display = (
-        'security_symbol',
-        'date',
-        'close_price',
-        'open_price',
-        'high_price',
-        'low_price',
-        'volume',
-        'price_change_display',
-        'price_change_percent_display'
-    )
-    list_filter = (
-        'date',
-        'security__security_type',
-        'security__exchange',
-        'security__currency'
-    )
-    search_fields = (
-        'security__symbol',
-        'security__name'
-    )
-    readonly_fields = (
-        'created_at',
-        'updated_at',
-        'price_change',
-        'price_change_percent',
-        'trading_range'
-    )
-    ordering = ('-date', 'security__symbol')
-    list_per_page = 100
-    date_hierarchy = 'date'
-    
-    fieldsets = (
-        ('Security & Date', {
-            'fields': (
-                'security',
-                'date'
-            )
-        }),
-        ('Price Data', {
-            'fields': (
-                'open_price',
-                'high_price',
-                'low_price',
-                'close_price',
-                'adjusted_close'
-            )
-        }),
-        ('Volume', {
-            'fields': (
-                'volume',
-            )
-        }),
-        ('Calculated Fields', {
-            'fields': (
-                'price_change',
-                'price_change_percent',
-                'trading_range'
-            ),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': (
-                'created_at',
-                'updated_at'
-            ),
-            'classes': ('collapse',)
-        })
-    )
-    
-    def security_symbol(self, obj):
-        return obj.security.symbol
-    security_symbol.short_description = 'Symbol'
-    security_symbol.admin_order_field = 'security__symbol'
-    
-    def price_change_display(self, obj):
-        change = obj.price_change
-        color = "green" if change > 0 else "red" if change < 0 else "black"
-        return format_html(
-            '<span style="color: {};">{:+.4f}</span>',
-            color,
-            change
-        )
-    price_change_display.short_description = 'Change'
-    
-    def price_change_percent_display(self, obj):
-        percent = obj.price_change_percent
-        color = "green" if percent > 0 else "red" if percent < 0 else "black"
-        return format_html(
-            '<span style="color: {};">{:+.2f}%</span>',
-            color,
-            percent
-        )
-    price_change_percent_display.short_description = 'Change %'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('security')
+        return super().get_queryset(request)
 
 
 @admin.register(SecuritiesMovement)

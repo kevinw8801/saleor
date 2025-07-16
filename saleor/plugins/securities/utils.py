@@ -479,7 +479,7 @@ def create_security(
         Created Securities instance
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         
         security = Securities.objects.create(
             symbol=symbol.upper(),
@@ -510,7 +510,7 @@ def get_security_by_symbol(symbol: str, security_type: Optional[str] = None) -> 
         Securities instance if found, None otherwise
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         
         query = Securities.objects.filter(symbol=symbol.upper())
         if security_type:
@@ -546,7 +546,7 @@ def search_securities(
         List of matching Securities instances
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         
         query = Securities.objects.filter(is_active=is_active)
         
@@ -578,7 +578,7 @@ def get_securities_by_type(security_type: str, is_active: bool = True) -> List['
         List of Securities instances
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         
         return list(Securities.objects.filter(
             security_type=security_type,
@@ -609,7 +609,7 @@ def update_security_market_data(
         True if updated successfully, False otherwise
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         
         security = Securities.objects.get(security_id=security_id)
         
@@ -636,7 +636,7 @@ def get_securities_statistics() -> Dict[str, Any]:
         Dictionary with securities statistics
     """
     try:
-        from .models import Securities
+        from ...polygon.models import Securities
         from django.db.models import Count
         
         total_securities = Securities.objects.count()
@@ -703,7 +703,7 @@ def add_daily_price(
         True if added successfully, False otherwise
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         from datetime import datetime
         from decimal import Decimal
         
@@ -739,7 +739,7 @@ def get_latest_price(security_id: str) -> Optional[Dict[str, Any]]:
         Dictionary with latest price data or None
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         
         security = Securities.objects.get(security_id=security_id)
         latest_price = SecurityDailyPrices.objects.filter(
@@ -785,7 +785,7 @@ def get_price_history(
         List of price records
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         from datetime import datetime
         
         security = Securities.objects.get(security_id=security_id)
@@ -831,7 +831,7 @@ def get_price_by_date(security_id: str, date: str) -> Optional[Dict[str, Any]]:
         Price data for the date or None
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         from datetime import datetime
         
         security = Securities.objects.get(security_id=security_id)
@@ -872,7 +872,7 @@ def bulk_add_daily_prices(price_data: List[Dict[str, Any]]) -> Dict[str, int]:
         Dictionary with success/error counts
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         from datetime import datetime
         from decimal import Decimal
         
@@ -925,7 +925,7 @@ def get_price_statistics(security_id: str, days: int = 30) -> Dict[str, Any]:
         Dictionary with price statistics
     """
     try:
-        from .models import Securities, SecurityDailyPrices
+        from ...polygon.models import Securities, SecurityDailyPrices
         from datetime import datetime, timedelta
         from django.db.models import Avg, Max, Min, Sum
         

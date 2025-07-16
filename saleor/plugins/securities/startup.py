@@ -20,7 +20,7 @@ def initialize_tickers_data():
         # Import here to avoid circular imports
         from django.db import connection
         from ...polygon.clients import PolygonIOClient
-        from ...polygon.models import Tickers
+        from .models import Tickers
         
         # Check if tickers table exists
         with connection.cursor() as cursor:
