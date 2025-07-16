@@ -1,10 +1,70 @@
 # Generated for securities plugin - Initial migration
+# This migration handles the case where tables may already exist from polygon app
 
 import django.core.validators
 from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
 import uuid
+
+
+def check_and_create_tables(apps, schema_editor):
+    """Check if tables already exist and create only if they don't"""
+    from django.db import connection
+    
+    with connection.cursor() as cursor:
+        # Define tables that might already exist
+        tables_to_check = [
+            'tickers',
+            'securities_alert',
+            'securities_batch', 
+            'securities_forecast',
+            'securities_movement',
+            'securities_settings',
+            'securities_reorder_suggestion'
+        ]
+        
+        existing_tables = []
+        
+        # Check which tables already exist
+        for table_name in tables_to_check:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                );
+            """, [table_name])
+            if cursor.fetchone()[0]:
+                existing_tables.append(table_name)
+                
+        print(f"Found existing tables: {existing_tables}")
+        
+        # Create tickers table if it doesn't exist
+        if 'tickers' not in existing_tables:
+            cursor.execute("""
+                CREATE TABLE tickers (
+                    ticker VARCHAR(10) PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    type VARCHAR(10) NOT NULL,
+                    exchange VARCHAR(10) NOT NULL,
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    last_updated TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                );
+            """)
+            
+            # Create indexes for tickers
+            cursor.execute("CREATE INDEX idx_ticker_search ON tickers (ticker, name);")
+            cursor.execute("CREATE INDEX securities_tickers_type_idx ON tickers (type);")
+            cursor.execute("CREATE INDEX securities_tickers_exchange_idx ON tickers (exchange);")
+            cursor.execute("CREATE INDEX securities_tickers_active_idx ON tickers (active);")
+            print("Created tickers table")
+        else:
+            print("tickers table already exists, skipping creation")
+
+
+def reverse_check_and_create_tables(apps, schema_editor):
+    """Reverse operation - don't drop tables as they might be used by other apps"""
+    pass
 
 
 class Migration(migrations.Migration):
@@ -16,23 +76,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Tickers',
-            fields=[
-                ('ticker', models.CharField(help_text='Ticker symbol (e.g., AAPL, SPY)', max_length=10, primary_key=True, serialize=False)),
-                ('name', models.CharField(help_text='Company/fund name', max_length=255)),
-                ('type', models.CharField(choices=[('cs', 'Common Stock'), ('etp', 'Exchange Traded Product')], help_text="Type of security - 'cs' for stock, 'etp' for ETF", max_length=10)),
-                ('exchange', models.CharField(help_text='Exchange where the ticker is traded', max_length=10)),
-                ('active', models.BooleanField(default=True, help_text='Whether the ticker is actively traded')),
-                ('last_updated', models.DateTimeField(auto_now=True, help_text='Timestamp of last update')),
-            ],
-            options={
-                'verbose_name': 'Ticker',
-                'verbose_name_plural': 'Tickers',
-                'db_table': 'tickers',
-                'ordering': ['ticker'],
-            },
-        ),
+        # Check and create tables if they don't exist
+        migrations.RunPython(check_and_create_tables, reverse_check_and_create_tables),
+        
+        # Create models that don't have table conflicts
         migrations.CreateModel(
             name='SecuritiesAlert',
             fields=[
@@ -145,7 +192,27 @@ class Migration(migrations.Migration):
                 'ordering': ['-created_at'],
             },
         ),
-        # Add indexes for Tickers
+        
+        # Create the Tickers model to register it with Django
+        migrations.CreateModel(
+            name='Tickers',
+            fields=[
+                ('ticker', models.CharField(help_text='Ticker symbol (e.g., AAPL, SPY)', max_length=10, primary_key=True, serialize=False)),
+                ('name', models.CharField(help_text='Company/fund name', max_length=255)),
+                ('type', models.CharField(choices=[('cs', 'Common Stock'), ('etp', 'Exchange Traded Product')], help_text="Type of security - 'cs' for stock, 'etp' for ETF", max_length=10)),
+                ('exchange', models.CharField(help_text='Exchange where the ticker is traded', max_length=10)),
+                ('active', models.BooleanField(default=True, help_text='Whether the ticker is actively traded')),
+                ('last_updated', models.DateTimeField(auto_now=True, help_text='Timestamp of last update')),
+            ],
+            options={
+                'verbose_name': 'Ticker',
+                'verbose_name_plural': 'Tickers',
+                'db_table': 'tickers',
+                'ordering': ['ticker'],
+            },
+        ),
+        
+        # Add indexes for all models
         migrations.AddIndex(
             model_name='tickers',
             index=models.Index(fields=['ticker', 'name'], name='idx_ticker_search'),
@@ -162,7 +229,6 @@ class Migration(migrations.Migration):
             model_name='tickers',
             index=models.Index(fields=['active'], name='securities_tickers_active_idx'),
         ),
-        # Add indexes for SecuritiesAlert
         migrations.AddIndex(
             model_name='securitiesalert',
             index=models.Index(fields=['stock', 'alert_type'], name='securities_alert_stock_alert_type_idx'),
@@ -171,7 +237,6 @@ class Migration(migrations.Migration):
             model_name='securitiesalert',
             index=models.Index(fields=['is_resolved', 'created_at'], name='securities_alert_is_resolved_created_at_idx'),
         ),
-        # Add indexes for SecuritiesBatch
         migrations.AddIndex(
             model_name='securitiesbatch',
             index=models.Index(fields=['stock', 'expiry_date'], name='securities_batch_stock_expiry_date_idx'),
@@ -180,7 +245,6 @@ class Migration(migrations.Migration):
             model_name='securitiesbatch',
             index=models.Index(fields=['expiry_date', 'is_expired'], name='securities_batch_expiry_date_is_expired_idx'),
         ),
-        # Add indexes for SecuritiesForecast
         migrations.AddIndex(
             model_name='securitiesforecast',
             index=models.Index(fields=['stock', 'forecast_date'], name='securities_forecast_stock_forecast_date_idx'),
@@ -189,7 +253,6 @@ class Migration(migrations.Migration):
             model_name='securitiesforecast',
             index=models.Index(fields=['forecast_date'], name='securities_forecast_forecast_date_idx'),
         ),
-        # Add indexes for SecuritiesMovement
         migrations.AddIndex(
             model_name='securitiesmovement',
             index=models.Index(fields=['stock', 'timestamp'], name='securities_movement_stock_timestamp_idx'),
@@ -198,7 +261,6 @@ class Migration(migrations.Migration):
             model_name='securitiesmovement',
             index=models.Index(fields=['movement_type', 'timestamp'], name='securities_movement_movement_type_timestamp_idx'),
         ),
-        # Add indexes for ReorderSuggestion
         migrations.AddIndex(
             model_name='reordersuggestion',
             index=models.Index(fields=['stock', 'is_processed'], name='securities_reorder_suggestion_stock_is_processed_idx'),
@@ -207,6 +269,7 @@ class Migration(migrations.Migration):
             model_name='reordersuggestion',
             index=models.Index(fields=['urgency_level', 'created_at'], name='securities_reorder_suggestion_urgency_level_created_at_idx'),
         ),
+        
         # Add unique constraints
         migrations.AlterUniqueTogether(
             name='securitiesbatch',
