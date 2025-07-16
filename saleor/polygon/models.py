@@ -272,7 +272,7 @@ class SecurityDailyPrices(models.Model):
 
 
 # Import warehouse Stock model
-from ...warehouse.models import Stock
+from saleor.warehouse.models import Stock
 
 
 class SecuritiesMovement(models.Model):
