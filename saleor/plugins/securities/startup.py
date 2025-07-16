@@ -77,7 +77,6 @@ def initialize_tickers_data():
         
         if inserted_count > 0:
             # Count final results by type
-            from ...polygon.models import Tickers
             total_tickers = Tickers.objects.count()
             stocks_count = Tickers.objects.filter(type='cs').count()
             etfs_count = Tickers.objects.filter(type='etp').count()
@@ -329,7 +328,7 @@ def bulk_insert_tickers(tickers_data: List[Dict[str, Any]]) -> int:
     
     try:
         # Import here to avoid circular imports
-        from ...polygon.models import Tickers
+        from .models import Tickers
         
         with transaction.atomic():
             # Create ticker objects
