@@ -1088,3 +1088,6 @@ patch_db()
 # Patch `Local` to remove all references that could result in reference cycles,
 # allowing memory to be freed immediately, without the need of a deep garbage collection cycle.
 patch_local()
+
+# Polygon.io API Configuration
+POLYGON_IO_API_KEY = os.environ.get('POLYGON_IO_API_KEY', 'RNqYO8cU2YoeqIxLB3FJHtFzZCo2hCem')

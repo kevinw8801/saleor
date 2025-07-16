@@ -51,6 +51,8 @@ def initialize_tickers_data():
             polygon_client = PolygonIOClient()
         except ValueError as e:
             logger.error(f"Failed to initialize Polygon.io client: {e}")
+            logger.info("To configure Polygon.io API key, set POLYGON_IO_API_KEY environment variable or update settings.py")
+            logger.info("A default API key is configured but may have rate limits. For production, get your own key from https://polygon.io/")
             return
         
         # Fetch US stocks and ETFs
