@@ -10,6 +10,11 @@ class SecuritiesConfig(AppConfig):
         """
         Called when the app is ready. This is where we can perform startup tasks.
         """
+        # Don't run startup logic during migrations or static file collection
+        import sys
+        if any(arg in sys.argv for arg in ['migrate', 'makemigrations', 'collectstatic', 'test']):
+            return
+        
         # Import here to avoid circular imports
         from .startup import initialize_tickers_data
         
