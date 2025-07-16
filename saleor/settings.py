@@ -318,7 +318,6 @@ INSTALLED_APPS = [
     "saleor.thumbnail",
     "saleor.schedulers",
     "saleor.plugins.tradex",
-    "saleor.plugins.securities",
     "saleor.polygon",
     # External apps
     "django_measurement",

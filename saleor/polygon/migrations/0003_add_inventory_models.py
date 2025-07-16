@@ -1,4 +1,4 @@
-# Generated manually for securities plugin - inventory management models only
+# Generated manually for polygon app - Add inventory management models
 
 import django.core.validators
 from django.db import migrations, models
@@ -8,10 +8,9 @@ import django.utils.timezone
 
 class Migration(migrations.Migration):
 
-    initial = True
-
     dependencies = [
-        ('warehouse', '0001_initial'),  # Depends on warehouse app
+        ('warehouse', '0001_initial'),
+        ('polygon', '0002_add_securities_models'),
     ]
 
     operations = [
@@ -130,43 +129,43 @@ class Migration(migrations.Migration):
         # Add indexes
         migrations.AddIndex(
             model_name='securitiesalert',
-            index=models.Index(fields=['stock', 'alert_type'], name='securities_alert_stock_alert_type_idx'),
+            index=models.Index(fields=['stock', 'alert_type'], name='polygon_securities_alert_stock_alert_type_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesalert',
-            index=models.Index(fields=['is_resolved', 'created_at'], name='securities_alert_is_resolved_created_at_idx'),
+            index=models.Index(fields=['is_resolved', 'created_at'], name='polygon_securities_alert_is_resolved_created_at_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesbatch',
-            index=models.Index(fields=['stock', 'expiry_date'], name='securities_batch_stock_expiry_date_idx'),
+            index=models.Index(fields=['stock', 'expiry_date'], name='polygon_securities_batch_stock_expiry_date_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesbatch',
-            index=models.Index(fields=['expiry_date', 'is_expired'], name='securities_batch_expiry_date_is_expired_idx'),
+            index=models.Index(fields=['expiry_date', 'is_expired'], name='polygon_securities_batch_expiry_date_is_expired_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesforecast',
-            index=models.Index(fields=['stock', 'forecast_date'], name='securities_forecast_stock_forecast_date_idx'),
+            index=models.Index(fields=['stock', 'forecast_date'], name='polygon_securities_forecast_stock_forecast_date_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesforecast',
-            index=models.Index(fields=['forecast_date'], name='securities_forecast_forecast_date_idx'),
+            index=models.Index(fields=['forecast_date'], name='polygon_securities_forecast_forecast_date_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesmovement',
-            index=models.Index(fields=['stock', 'timestamp'], name='securities_movement_stock_timestamp_idx'),
+            index=models.Index(fields=['stock', 'timestamp'], name='polygon_securities_movement_stock_timestamp_idx'),
         ),
         migrations.AddIndex(
             model_name='securitiesmovement',
-            index=models.Index(fields=['movement_type', 'timestamp'], name='securities_movement_movement_type_timestamp_idx'),
+            index=models.Index(fields=['movement_type', 'timestamp'], name='polygon_securities_movement_movement_type_timestamp_idx'),
         ),
         migrations.AddIndex(
             model_name='reordersuggestion',
-            index=models.Index(fields=['stock', 'is_processed'], name='securities_reorder_suggestion_stock_is_processed_idx'),
+            index=models.Index(fields=['stock', 'is_processed'], name='polygon_reorder_suggestion_stock_is_processed_idx'),
         ),
         migrations.AddIndex(
             model_name='reordersuggestion',
-            index=models.Index(fields=['urgency_level', 'created_at'], name='securities_reorder_suggestion_urgency_level_created_at_idx'),
+            index=models.Index(fields=['urgency_level', 'created_at'], name='polygon_reorder_suggestion_urgency_level_created_at_idx'),
         ),
         # Add unique constraints
         migrations.AlterUniqueTogether(
