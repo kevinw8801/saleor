@@ -79,204 +79,118 @@ class Migration(migrations.Migration):
         # Check and create tables if they don't exist
         migrations.RunPython(check_and_create_tables, reverse_check_and_create_tables),
         
-        # Create models that don't have table conflicts
-        migrations.CreateModel(
-            name='SecuritiesAlert',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('alert_type', models.CharField(choices=[('low_securities', 'Low Securities'), ('out_of_securities', 'Out Of Securities'), ('reorder_point', 'Reorder Point'), ('overstocked', 'Overstocked')], max_length=20)),
-                ('message', models.TextField()),
-                ('quantity_at_alert', models.IntegerField()),
-                ('threshold', models.IntegerField(blank=True, null=True)),
-                ('is_resolved', models.BooleanField(default=False)),
-                ('resolved_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='securities_alerts', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_alert',
-                'ordering': ['-created_at'],
-            },
+        # Create models that don't have table conflicts - only if table doesn't exist
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_alert (
+                    id SERIAL PRIMARY KEY,
+                    alert_type VARCHAR(20) NOT NULL,
+                    message TEXT NOT NULL,
+                    quantity_at_alert INTEGER NOT NULL,
+                    threshold INTEGER,
+                    is_resolved BOOLEAN NOT NULL DEFAULT FALSE,
+                    resolved_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    stock_id INTEGER NOT NULL REFERENCES warehouse_stock(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS securities_alert_stock_alert_type_idx ON securities_alert (stock_id, alert_type);
+                CREATE INDEX IF NOT EXISTS securities_alert_is_resolved_created_at_idx ON securities_alert (is_resolved, created_at);
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_alert CASCADE;"
         ),
-        migrations.CreateModel(
-            name='SecuritiesBatch',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('batch_number', models.CharField(max_length=100)),
-                ('quantity', models.IntegerField(validators=[django.core.validators.MinValueValidator(0)])),
-                ('cost_per_unit', models.DecimalField(blank=True, decimal_places=4, max_digits=12, null=True)),
-                ('expiry_date', models.DateField(blank=True, null=True)),
-                ('received_date', models.DateField(auto_now_add=True)),
-                ('supplier_reference', models.CharField(blank=True, max_length=255)),
-                ('is_expired', models.BooleanField(default=False)),
-                ('notes', models.TextField(blank=True)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='securities_batches', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_batch',
-                'ordering': ['expiry_date', 'received_date'],
-            },
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_batch (
+                    id SERIAL PRIMARY KEY,
+                    batch_number VARCHAR(100) NOT NULL,
+                    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+                    cost_per_unit DECIMAL(12, 4),
+                    expiry_date DATE,
+                    received_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    supplier_reference VARCHAR(255),
+                    is_expired BOOLEAN NOT NULL DEFAULT FALSE,
+                    notes TEXT,
+                    stock_id INTEGER NOT NULL REFERENCES warehouse_stock(id) ON DELETE CASCADE,
+                    UNIQUE(stock_id, batch_number)
+                );
+                CREATE INDEX IF NOT EXISTS securities_batch_stock_expiry_date_idx ON securities_batch (stock_id, expiry_date);
+                CREATE INDEX IF NOT EXISTS securities_batch_expiry_date_is_expired_idx ON securities_batch (expiry_date, is_expired);
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_batch CASCADE;"
         ),
-        migrations.CreateModel(
-            name='SecuritiesForecast',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('forecast_date', models.DateField()),
-                ('predicted_demand', models.IntegerField(validators=[django.core.validators.MinValueValidator(0)])),
-                ('confidence_level', models.DecimalField(decimal_places=2, help_text='Confidence level as percentage (0-100)', max_digits=5, validators=[django.core.validators.MinValueValidator(0)])),
-                ('actual_demand', models.IntegerField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(0)])),
-                ('forecast_method', models.CharField(default='moving_average', max_length=50)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='securities_forecasts', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_forecast',
-                'ordering': ['-forecast_date'],
-            },
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_forecast (
+                    id SERIAL PRIMARY KEY,
+                    forecast_date DATE NOT NULL,
+                    predicted_demand INTEGER NOT NULL CHECK (predicted_demand >= 0),
+                    confidence_level DECIMAL(5, 2) NOT NULL CHECK (confidence_level >= 0),
+                    actual_demand INTEGER CHECK (actual_demand >= 0),
+                    forecast_method VARCHAR(50) NOT NULL DEFAULT 'moving_average',
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    stock_id INTEGER NOT NULL REFERENCES warehouse_stock(id) ON DELETE CASCADE,
+                    UNIQUE(stock_id, forecast_date, forecast_method)
+                );
+                CREATE INDEX IF NOT EXISTS securities_forecast_stock_forecast_date_idx ON securities_forecast (stock_id, forecast_date);
+                CREATE INDEX IF NOT EXISTS securities_forecast_forecast_date_idx ON securities_forecast (forecast_date);
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_forecast CASCADE;"
         ),
-        migrations.CreateModel(
-            name='SecuritiesMovement',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('quantity_change', models.IntegerField(help_text='Positive for increase, negative for decrease')),
-                ('previous_quantity', models.IntegerField()),
-                ('new_quantity', models.IntegerField()),
-                ('movement_type', models.CharField(choices=[('adjustment', 'Adjustment'), ('purchase', 'Purchase'), ('sale', 'Sale'), ('return', 'Return'), ('transfer', 'Transfer'), ('damaged', 'Damaged'), ('expired', 'Expired')], default='adjustment', max_length=20)),
-                ('timestamp', models.DateTimeField(default=django.utils.timezone.now)),
-                ('notes', models.TextField(blank=True)),
-                ('reference_order', models.CharField(blank=True, max_length=100)),
-                ('created_by', models.CharField(blank=True, max_length=255)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='securities_movements', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_movement',
-                'ordering': ['-timestamp'],
-            },
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_movement (
+                    id SERIAL PRIMARY KEY,
+                    quantity_change INTEGER NOT NULL,
+                    previous_quantity INTEGER NOT NULL,
+                    new_quantity INTEGER NOT NULL,
+                    movement_type VARCHAR(20) NOT NULL DEFAULT 'adjustment',
+                    timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    notes TEXT,
+                    reference_order VARCHAR(100),
+                    created_by VARCHAR(255),
+                    stock_id INTEGER NOT NULL REFERENCES warehouse_stock(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS securities_movement_stock_timestamp_idx ON securities_movement (stock_id, timestamp);
+                CREATE INDEX IF NOT EXISTS securities_movement_movement_type_timestamp_idx ON securities_movement (movement_type, timestamp);
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_movement CASCADE;"
         ),
-        migrations.CreateModel(
-            name='SecuritiesSettings',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('reorder_point', models.IntegerField(help_text='Quantity threshold to trigger reorder', validators=[django.core.validators.MinValueValidator(0)])),
-                ('reorder_quantity', models.IntegerField(help_text='Quantity to order when reorder point is reached', validators=[django.core.validators.MinValueValidator(1)])),
-                ('safety_stock', models.IntegerField(default=0, help_text='Safety securities buffer quantity', validators=[django.core.validators.MinValueValidator(0)])),
-                ('max_stock_level', models.IntegerField(blank=True, help_text='Maximum securities level before overstock alert', null=True, validators=[django.core.validators.MinValueValidator(1)])),
-                ('lead_time_days', models.IntegerField(default=7, help_text='Lead time for restocking in days', validators=[django.core.validators.MinValueValidator(0)])),
-                ('enable_auto_reorder', models.BooleanField(default=False, help_text='Enable automatic reorder suggestions')),
-                ('track_expiry', models.BooleanField(default=False, help_text='Track expiry dates for this securities')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('stock', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='securities_settings', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_settings',
-            },
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_settings (
+                    id SERIAL PRIMARY KEY,
+                    reorder_point INTEGER NOT NULL CHECK (reorder_point >= 0),
+                    reorder_quantity INTEGER NOT NULL CHECK (reorder_quantity >= 1),
+                    safety_stock INTEGER NOT NULL DEFAULT 0 CHECK (safety_stock >= 0),
+                    max_stock_level INTEGER CHECK (max_stock_level >= 1),
+                    lead_time_days INTEGER NOT NULL DEFAULT 7 CHECK (lead_time_days >= 0),
+                    enable_auto_reorder BOOLEAN NOT NULL DEFAULT FALSE,
+                    track_expiry BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    stock_id INTEGER NOT NULL UNIQUE REFERENCES warehouse_stock(id) ON DELETE CASCADE
+                );
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_settings CASCADE;"
         ),
-        migrations.CreateModel(
-            name='ReorderSuggestion',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('suggested_quantity', models.IntegerField(validators=[django.core.validators.MinValueValidator(1)])),
-                ('reason', models.TextField()),
-                ('urgency_level', models.CharField(choices=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')], default='medium', max_length=20)),
-                ('estimated_cost', models.DecimalField(blank=True, decimal_places=2, max_digits=12, null=True)),
-                ('is_approved', models.BooleanField(default=False)),
-                ('is_processed', models.BooleanField(default=False)),
-                ('approved_by', models.CharField(blank=True, max_length=255)),
-                ('processed_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='securities_reorder_suggestions', to='warehouse.stock')),
-            ],
-            options={
-                'db_table': 'securities_reorder_suggestion',
-                'ordering': ['-created_at'],
-            },
-        ),
-        
-        # Create the Tickers model to register it with Django
-        migrations.CreateModel(
-            name='Tickers',
-            fields=[
-                ('ticker', models.CharField(help_text='Ticker symbol (e.g., AAPL, SPY)', max_length=10, primary_key=True, serialize=False)),
-                ('name', models.CharField(help_text='Company/fund name', max_length=255)),
-                ('type', models.CharField(choices=[('cs', 'Common Stock'), ('etp', 'Exchange Traded Product')], help_text="Type of security - 'cs' for stock, 'etp' for ETF", max_length=10)),
-                ('exchange', models.CharField(help_text='Exchange where the ticker is traded', max_length=10)),
-                ('active', models.BooleanField(default=True, help_text='Whether the ticker is actively traded')),
-                ('last_updated', models.DateTimeField(auto_now=True, help_text='Timestamp of last update')),
-            ],
-            options={
-                'verbose_name': 'Ticker',
-                'verbose_name_plural': 'Tickers',
-                'db_table': 'tickers',
-                'ordering': ['ticker'],
-            },
-        ),
-        
-        # Add indexes for all models
-        migrations.AddIndex(
-            model_name='tickers',
-            index=models.Index(fields=['ticker', 'name'], name='idx_ticker_search'),
-        ),
-        migrations.AddIndex(
-            model_name='tickers',
-            index=models.Index(fields=['type'], name='securities_tickers_type_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='tickers',
-            index=models.Index(fields=['exchange'], name='securities_tickers_exchange_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='tickers',
-            index=models.Index(fields=['active'], name='securities_tickers_active_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesalert',
-            index=models.Index(fields=['stock', 'alert_type'], name='securities_alert_stock_alert_type_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesalert',
-            index=models.Index(fields=['is_resolved', 'created_at'], name='securities_alert_is_resolved_created_at_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesbatch',
-            index=models.Index(fields=['stock', 'expiry_date'], name='securities_batch_stock_expiry_date_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesbatch',
-            index=models.Index(fields=['expiry_date', 'is_expired'], name='securities_batch_expiry_date_is_expired_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesforecast',
-            index=models.Index(fields=['stock', 'forecast_date'], name='securities_forecast_stock_forecast_date_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesforecast',
-            index=models.Index(fields=['forecast_date'], name='securities_forecast_forecast_date_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesmovement',
-            index=models.Index(fields=['stock', 'timestamp'], name='securities_movement_stock_timestamp_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='securitiesmovement',
-            index=models.Index(fields=['movement_type', 'timestamp'], name='securities_movement_movement_type_timestamp_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='reordersuggestion',
-            index=models.Index(fields=['stock', 'is_processed'], name='securities_reorder_suggestion_stock_is_processed_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='reordersuggestion',
-            index=models.Index(fields=['urgency_level', 'created_at'], name='securities_reorder_suggestion_urgency_level_created_at_idx'),
-        ),
-        
-        # Add unique constraints
-        migrations.AlterUniqueTogether(
-            name='securitiesbatch',
-            unique_together={('stock', 'batch_number')},
-        ),
-        migrations.AlterUniqueTogether(
-            name='securitiesforecast',
-            unique_together={('stock', 'forecast_date', 'forecast_method')},
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS securities_reorder_suggestion (
+                    id SERIAL PRIMARY KEY,
+                    suggested_quantity INTEGER NOT NULL CHECK (suggested_quantity >= 1),
+                    reason TEXT NOT NULL,
+                    urgency_level VARCHAR(20) NOT NULL DEFAULT 'medium',
+                    estimated_cost DECIMAL(12, 2),
+                    is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+                    is_processed BOOLEAN NOT NULL DEFAULT FALSE,
+                    approved_by VARCHAR(255),
+                    processed_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    stock_id INTEGER NOT NULL REFERENCES warehouse_stock(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS securities_reorder_suggestion_stock_is_processed_idx ON securities_reorder_suggestion (stock_id, is_processed);
+                CREATE INDEX IF NOT EXISTS securities_reorder_suggestion_urgency_level_created_at_idx ON securities_reorder_suggestion (urgency_level, created_at);
+            """,
+            reverse_sql="DROP TABLE IF EXISTS securities_reorder_suggestion CASCADE;"
         ),
     ]
