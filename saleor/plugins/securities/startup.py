@@ -97,7 +97,8 @@ def initialize_tickers_data():
 
 def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     """
-    Fetch US stocks and ETFs from Polygon.io v3/reference/tickers endpoint.
+    Fetch US stocks and ETFs from Polygon.io from all major US exchanges.
+    Includes NYSE, NASDAQ, NYSE American, Cboe BZX, IEX, OTC Markets, and other Cboe exchanges.
     Uses rate limiting and handles API errors gracefully.
     
     Returns:
@@ -106,7 +107,19 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     tickers_data = []
     next_url = None
     request_count = 0
-    max_requests = 5  # Limit for free tier (5 requests per minute)
+    max_requests = 8  # Increased to cover more exchanges
+    
+    # Major US exchanges to ensure comprehensive coverage
+    target_exchanges = [
+        'XNYS',   # NYSE
+        'XNAS',   # NASDAQ
+        'XASE',   # NYSE American
+        'XBZX',   # Cboe BZX
+        'IEXG',   # IEX
+        'OTCQ',   # OTC Markets - OTCQX
+        'OTCQB',  # OTC Markets - OTCQB
+        'OTCPK'   # OTC Markets - Pink
+    ]
     
     try:
         while True:
@@ -116,9 +129,8 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                 logger.info("For more data, consider upgrading Polygon.io plan or running this process during off-peak hours.")
                 break
             
-            # Prepare request parameters
+            # Prepare request parameters - Remove market restriction to get all securities
             params = {
-                'market': 'stocks',  # US stocks market
                 'active': 'true',
                 'limit': 1000  # Maximum allowed per request
             }
@@ -147,25 +159,43 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                 results = response['results']
                 
                 for ticker_data in results:
-                    # Filter for US stocks and ETFs only
+                    # Filter for US stocks and ETFs from major exchanges
                     ticker_type = ticker_data.get('type')
+                    primary_exchange = ticker_data.get('primary_exchange', '')
                     market = ticker_data.get('market', '').lower()
                     
-                    # Only include Common Stock (CS) and Exchange Traded Products (ETP)
-                    if ticker_type in ['CS', 'ETP'] and market == 'stocks':
+                    # Include Common Stock (CS) and Exchange Traded Products (ETP/ETF)
+                    # Accept from major US exchanges or general stock markets
+                    valid_type = ticker_type in ['CS', 'ETP', 'ETF']
+                    valid_exchange = primary_exchange in target_exchanges
+                    valid_market = market in ['stocks', 'otc', 'fx']  # Expanded market types
+                    
+                    if valid_type and (valid_exchange or valid_market):
+                        # Map different ETF types to 'etp'
+                        mapped_type = 'cs' if ticker_type == 'CS' else 'etp'
+                        
                         processed_ticker = {
                             'ticker': ticker_data.get('ticker', '').upper(),
                             'name': ticker_data.get('name', '')[:255],  # Limit to 255 chars
-                            'type': 'cs' if ticker_type == 'CS' else 'etp',
-                            'exchange': ticker_data.get('primary_exchange', '')[:10],  # Limit to 10 chars
+                            'type': mapped_type,
+                            'exchange': primary_exchange[:10],  # Limit to 10 chars
                             'active': ticker_data.get('active', True)
                         }
                         
-                        # Only add if ticker symbol is valid
-                        if processed_ticker['ticker'] and len(processed_ticker['ticker']) <= 10:
+                        # Only add if ticker symbol is valid and from target exchanges
+                        if (processed_ticker['ticker'] and 
+                            len(processed_ticker['ticker']) <= 10 and
+                            processed_ticker['exchange']):
                             tickers_data.append(processed_ticker)
+                            
+                            # Log ETF finds for debugging
+                            if mapped_type == 'etp':
+                                logger.debug(f"Found ETF: {processed_ticker['ticker']} from {primary_exchange}")
                 
-                logger.info(f"Processed page {request_count}, got {len(results)} tickers. Total so far: {len(tickers_data)}")
+                # Count types for better debugging
+                cs_count = len([t for t in tickers_data if t.get('type') == 'cs'])
+                etp_count = len([t for t in tickers_data if t.get('type') == 'etp'])
+                logger.info(f"Processed page {request_count}, got {len(results)} tickers. Total so far: {len(tickers_data)} (CS: {cs_count}, ETP: {etp_count})")
                 
                 # Check for pagination
                 next_url = response.get('next_url')
@@ -185,7 +215,10 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
         logger.error(f"Error fetching tickers from Polygon.io: {e}")
     
     logger.info(f"Finished fetching. Total tickers collected: {len(tickers_data)}")
-    logger.info(f"Made {request_count} API requests")
+    # Final summary
+    cs_count = len([t for t in tickers_data if t.get('type') == 'cs'])
+    etp_count = len([t for t in tickers_data if t.get('type') == 'etp'])
+    logger.info(f"General fetch completed: {len(tickers_data)} total tickers (CS: {cs_count}, ETP: {etp_count}) from {request_count} API requests")
     
     return tickers_data
 
@@ -193,7 +226,7 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
 def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
     """
     Fetch US ETFs specifically from Polygon.io v3/reference/tickers endpoint.
-    This makes a targeted call for ETFs to ensure comprehensive coverage.
+    This makes a targeted call for ETFs to ensure comprehensive coverage from all major exchanges.
     
     Returns:
         List of ETF ticker dictionaries
@@ -201,7 +234,19 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
     etf_data = []
     next_url = None
     request_count = 0
-    max_requests = 3  # Limit requests for ETF-specific call
+    max_requests = 5  # Increased for better ETF coverage
+    
+    # Major US exchanges for ETFs
+    target_exchanges = [
+        'XNYS',   # NYSE - many ETFs
+        'XNAS',   # NASDAQ - ~4,351 ETFs
+        'XASE',   # NYSE American - some ETFs
+        'XBZX',   # Cboe BZX - ETFs and some stocks
+        'IEXG',   # IEX - stocks and ETFs
+        'XBYX',   # Other Cboe exchanges
+        'XEDA',   # Other Cboe exchanges
+        'XEDG'    # Other Cboe exchanges
+    ]
     
     try:
         while True:
@@ -210,9 +255,8 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                 logger.info(f"Reached ETF request limit of {max_requests}. Collected {len(etf_data)} ETFs.")
                 break
             
-            # Prepare request parameters specifically for ETFs
+            # Prepare request parameters specifically for ETFs - Remove market restriction
             params = {
-                'market': 'stocks',  # US stocks market includes ETFs
                 'type': 'ETP',       # Exchange Traded Products (ETFs)
                 'active': 'true',
                 'limit': 1000
@@ -240,23 +284,31 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                 results = response['results']
                 
                 for ticker_data in results:
-                    # Filter for US ETFs only
+                    # Filter for US ETFs from major exchanges
                     ticker_type = ticker_data.get('type')
+                    primary_exchange = ticker_data.get('primary_exchange', '')
                     market = ticker_data.get('market', '').lower()
                     
-                    # Only include Exchange Traded Products
-                    if ticker_type == 'ETP' and market == 'stocks':
+                    # Include Exchange Traded Products (ETP/ETF) from major exchanges
+                    valid_type = ticker_type in ['ETP', 'ETF']
+                    valid_exchange = primary_exchange in target_exchanges
+                    valid_market = market in ['stocks', 'otc', 'fx']  # Expanded market types
+                    
+                    if valid_type and (valid_exchange or valid_market):
                         processed_ticker = {
                             'ticker': ticker_data.get('ticker', '').upper(),
                             'name': ticker_data.get('name', '')[:255],
                             'type': 'etp',
-                            'exchange': ticker_data.get('primary_exchange', '')[:10],
+                            'exchange': primary_exchange[:10],
                             'active': ticker_data.get('active', True)
                         }
                         
-                        # Only add if ticker symbol is valid
-                        if processed_ticker['ticker'] and len(processed_ticker['ticker']) <= 10:
+                        # Only add if ticker symbol is valid and from target exchanges
+                        if (processed_ticker['ticker'] and 
+                            len(processed_ticker['ticker']) <= 10 and
+                            processed_ticker['exchange']):
                             etf_data.append(processed_ticker)
+                            logger.debug(f"Found ETF: {processed_ticker['ticker']} from {primary_exchange}")
                 
                 logger.info(f"ETF page {request_count}, got {len(results)} results. ETFs collected: {len(etf_data)}")
                 
@@ -276,7 +328,11 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error fetching ETFs from Polygon.io: {e}")
     
-    logger.info(f"ETF-specific fetch completed. Total ETFs collected: {len(etf_data)}")
+    logger.info(f"ETF-specific fetch completed: {len(etf_data)} ETFs from {request_count} API requests")
+    if etf_data:
+        exchanges = list(set(etf['exchange'] for etf in etf_data if etf.get('exchange')))
+        logger.info(f"ETFs found from exchanges: {exchanges}")
+    
     return etf_data
 
 
