@@ -898,7 +898,7 @@ CACHES["default"]["TIMEOUT"] = parse(os.environ.get("CACHE_TIMEOUT", "7 days"))
 
 JWT_EXPIRE = True
 JWT_TTL_ACCESS = datetime.timedelta(
-    seconds=parse(os.environ.get("JWT_TTL_ACCESS", "5 minutes"))
+    seconds=parse(os.environ.get("JWT_TTL_ACCESS", "30 minutes"))
 )
 JWT_TTL_APP_ACCESS = datetime.timedelta(
     seconds=parse(os.environ.get("JWT_TTL_APP_ACCESS", "5 minutes"))
