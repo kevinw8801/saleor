@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.conf import settings
 
 
 class Operation(models.Model):
@@ -171,3 +172,164 @@ class Holding(models.Model):
     def total_value(self):
         """Calculate total value of the holding."""
         return self.amount * self.purchase_price
+
+
+class ProductUserAssociation(models.Model):
+    """
+    Model to track user associations with products in the Tradex plugin.
+    Stores information about who created/modified products and when.
+    """
+    
+    ACTION_TYPES = [
+        ('created', 'Product Created'),
+        ('updated', 'Product Updated'),
+        ('deleted', 'Product Deleted'),
+        ('variant_created', 'Product Variant Created'),
+        ('variant_updated', 'Product Variant Updated'),
+        ('variant_deleted', 'Product Variant Deleted'),
+        ('media_created', 'Product Media Created'),
+        ('media_updated', 'Product Media Updated'),
+        ('media_deleted', 'Product Media Deleted'),
+    ]
+    
+    # Foreign key to Saleor's Product model
+    product = models.ForeignKey(
+        'product.Product',
+        on_delete=models.CASCADE,
+        related_name='tradex_user_associations',
+        help_text="Reference to the Saleor product"
+    )
+    
+    # Foreign key to User model - nullable for system actions
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tradex_product_associations',
+        help_text="User who performed the action (null for system actions)"
+    )
+    
+    # Action type performed
+    action_type = models.CharField(
+        max_length=20,
+        choices=ACTION_TYPES,
+        default='created',
+        help_text="Type of action performed on the product"
+    )
+    
+    # Timestamp of the action
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the action was performed"
+    )
+    
+    # Additional context data (JSON field for flexibility)
+    context_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional context about the action (e.g., variant ID, changes made)"
+    )
+    
+    # User agent or source of the action
+    source = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Source of the action (e.g., 'graphql_api', 'admin_panel', 'plugin')"
+    )
+    
+    # IP address for audit trail
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="IP address of the user who performed the action"
+    )
+    
+    class Meta:
+        db_table = 'tradex_product_user_association'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['product', 'action_type']),
+            models.Index(fields=['user', 'action_type']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['action_type', 'timestamp']),
+        ]
+        verbose_name = 'Product User Association'
+        verbose_name_plural = 'Product User Associations'
+    
+    def __str__(self):
+        user_str = f"User {self.user.username}" if self.user else "System"
+        return f"{user_str} {self.action_type} product {self.product.name} at {self.timestamp}"
+    
+    @classmethod
+    def track_action(cls, product, user, action_type, context_data=None, source=None, ip_address=None):
+        """
+        Convenience method to track a user action on a product.
+        
+        Args:
+            product: Product instance
+            user: User instance (can be None for system actions)
+            action_type: Type of action performed
+            context_data: Additional context data (dict)
+            source: Source of the action
+            ip_address: IP address of the user
+        
+        Returns:
+            ProductUserAssociation instance
+        """
+        return cls.objects.create(
+            product=product,
+            user=user,
+            action_type=action_type,
+            context_data=context_data or {},
+            source=source or 'unknown',
+            ip_address=ip_address
+        )
+    
+    @classmethod
+    def get_product_creator(cls, product):
+        """
+        Get the user who created the product.
+        
+        Args:
+            product: Product instance
+            
+        Returns:
+            User instance or None
+        """
+        association = cls.objects.filter(
+            product=product,
+            action_type='created'
+        ).first()
+        return association.user if association else None
+    
+    @classmethod
+    def get_user_products(cls, user, action_type=None):
+        """
+        Get all products associated with a user.
+        
+        Args:
+            user: User instance
+            action_type: Optional filter by action type
+            
+        Returns:
+            QuerySet of Product instances
+        """
+        queryset = cls.objects.filter(user=user)
+        if action_type:
+            queryset = queryset.filter(action_type=action_type)
+        
+        return queryset.values_list('product', flat=True).distinct()
+    
+    @classmethod
+    def get_product_history(cls, product):
+        """
+        Get the complete action history for a product.
+        
+        Args:
+            product: Product instance
+            
+        Returns:
+            QuerySet of ProductUserAssociation instances
+        """
+        return cls.objects.filter(product=product).order_by('-timestamp')

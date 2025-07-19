@@ -1,14 +1,19 @@
 from django.core.management import call_command
 from django.db import transaction
+import logging
 
 from ..base_plugin import BasePlugin, ConfigurationTypeField
 from .constants import PLUGIN_ID
+from .models import ProductUserAssociation
+
+
+logger = logging.getLogger(__name__)
 
 
 class TradexPlugin(BasePlugin):
     PLUGIN_ID = PLUGIN_ID
     PLUGIN_NAME = "Tradex"
-    PLUGIN_DESCRIPTION = "Trading and exchange functionality plugin for Saleor"
+    PLUGIN_DESCRIPTION = "Trading and exchange functionality plugin for Saleor with user tracking"
     DEFAULT_ACTIVE = True
     CONFIGURATION_PER_CHANNEL = False
     DEFAULT_CONFIGURATION = [
@@ -18,6 +23,8 @@ class TradexPlugin(BasePlugin):
         {"name": "webhook_url", "value": None},
         {"name": "auto_setup_utility_type", "value": True},
         {"name": "auto_setup_portfolio_type", "value": True},
+        {"name": "track_user_actions", "value": True},
+        {"name": "track_ip_addresses", "value": False},
     ]
 
     CONFIG_STRUCTURE = {
@@ -50,6 +57,16 @@ class TradexPlugin(BasePlugin):
             "type": ConfigurationTypeField.BOOLEAN,
             "help_text": "Automatically setup Portfolio product type on plugin activation",
             "label": "Auto Setup Portfolio Type",
+        },
+        "track_user_actions": {
+            "type": ConfigurationTypeField.BOOLEAN,
+            "help_text": "Track user actions on products (create, update, delete)",
+            "label": "Track User Actions",
+        },
+        "track_ip_addresses": {
+            "type": ConfigurationTypeField.BOOLEAN,
+            "help_text": "Track IP addresses of users performing actions",
+            "label": "Track IP Addresses",
         },
     }
 
@@ -98,3 +115,216 @@ class TradexPlugin(BasePlugin):
                 "portfolio": portfolio_result
             }
         }
+
+    # Helper methods for user tracking
+    def _should_track_actions(self):
+        """Check if user action tracking is enabled."""
+        return self.configuration.get("track_user_actions", True)
+
+    def _should_track_ip(self):
+        """Check if IP address tracking is enabled."""
+        return self.configuration.get("track_ip_addresses", False)
+
+    def _get_user_from_requestor(self):
+        """Extract user from requestor, handling both User and App instances."""
+        if not self.requestor:
+            return None
+        
+        # Handle different types of requestors
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        if isinstance(self.requestor, User):
+            return self.requestor
+        
+        # For app tokens or other non-user requestors
+        return None
+
+    def _get_context_info(self):
+        """Get additional context information from the request."""
+        context = {}
+        
+        # Try to get IP address if tracking is enabled
+        if self._should_track_ip() and hasattr(self.requestor, 'META'):
+            # Get IP from various headers
+            x_forwarded_for = self.requestor.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                context['ip_address'] = x_forwarded_for.split(',')[0].strip()
+            else:
+                context['ip_address'] = self.requestor.META.get('REMOTE_ADDR')
+        
+        return context
+
+    def _track_product_action(self, product, action_type, additional_context=None):
+        """Internal method to track product actions."""
+        if not self._should_track_actions():
+            return
+
+        try:
+            user = self._get_user_from_requestor()
+            context_info = self._get_context_info()
+            
+            # Merge additional context
+            if additional_context:
+                context_info.update(additional_context)
+            
+            # Determine source
+            source = 'graphql_api'  # Default assumption
+            if hasattr(self.requestor, 'META'):
+                user_agent = self.requestor.META.get('HTTP_USER_AGENT', '')
+                if 'admin' in user_agent.lower():
+                    source = 'admin_panel'
+            
+            ProductUserAssociation.track_action(
+                product=product,
+                user=user,
+                action_type=action_type,
+                context_data=context_info,
+                source=source,
+                ip_address=context_info.get('ip_address')
+            )
+            
+            logger.info(f"Tracked {action_type} action for product {product.id} by user {user.id if user else 'system'}")
+            
+        except Exception as e:
+            logger.error(f"Error tracking product action: {e}")
+
+    # Plugin hook methods for product tracking
+    def product_created(self, product, previous_value=None, webhooks=None):
+        """Hook called when a product is created."""
+        self._track_product_action(
+            product=product,
+            action_type='created',
+            additional_context={
+                'product_type': product.product_type.name if product.product_type else None,
+                'category': product.category.name if product.category else None,
+            }
+        )
+        return previous_value
+
+    def product_updated(self, product, previous_value=None, webhooks=None):
+        """Hook called when a product is updated."""
+        self._track_product_action(
+            product=product,
+            action_type='updated',
+            additional_context={
+                'updated_fields': getattr(product, '_dirty_fields', [])
+            }
+        )
+        return previous_value
+
+    def product_deleted(self, product, product_ids, previous_value=None, webhooks=None):
+        """Hook called when products are deleted."""
+        # For bulk deletes, product_ids contains the IDs
+        if product_ids:
+            for product_id in product_ids:
+                try:
+                    # Create a mock product object for tracking
+                    product_obj = type('Product', (), {'id': product_id, 'name': f'Product {product_id}'})()
+                    self._track_product_action(
+                        product=product_obj,
+                        action_type='deleted',
+                        additional_context={'bulk_delete': True, 'total_deleted': len(product_ids)}
+                    )
+                except Exception as e:
+                    logger.error(f"Error tracking delete for product {product_id}: {e}")
+        elif product:
+            self._track_product_action(
+                product=product,
+                action_type='deleted'
+            )
+        return previous_value
+
+    def product_variant_created(self, product_variant, previous_value=None, webhooks=None):
+        """Hook called when a product variant is created."""
+        if product_variant.product:
+            self._track_product_action(
+                product=product_variant.product,
+                action_type='variant_created',
+                additional_context={
+                    'variant_id': product_variant.id,
+                    'variant_sku': product_variant.sku,
+                    'variant_name': product_variant.name
+                }
+            )
+        return previous_value
+
+    def product_variant_updated(self, product_variant, previous_value=None, webhooks=None):
+        """Hook called when a product variant is updated."""
+        if product_variant.product:
+            self._track_product_action(
+                product=product_variant.product,
+                action_type='variant_updated',
+                additional_context={
+                    'variant_id': product_variant.id,
+                    'variant_sku': product_variant.sku,
+                    'updated_fields': getattr(product_variant, '_dirty_fields', [])
+                }
+            )
+        return previous_value
+
+    def product_variant_deleted(self, product_variant, previous_value=None, webhooks=None):
+        """Hook called when a product variant is deleted."""
+        if product_variant.product:
+            self._track_product_action(
+                product=product_variant.product,
+                action_type='variant_deleted',
+                additional_context={
+                    'variant_id': product_variant.id,
+                    'variant_sku': product_variant.sku
+                }
+            )
+        return previous_value
+
+    def product_media_created(self, product_media, previous_value=None, webhooks=None):
+        """Hook called when product media is created."""
+        if product_media.product:
+            self._track_product_action(
+                product=product_media.product,
+                action_type='media_created',
+                additional_context={
+                    'media_id': product_media.id,
+                    'media_type': product_media.type,
+                    'media_url': product_media.image.url if product_media.image else None
+                }
+            )
+        return previous_value
+
+    def product_media_updated(self, product_media, previous_value=None, webhooks=None):
+        """Hook called when product media is updated."""
+        if product_media.product:
+            self._track_product_action(
+                product=product_media.product,
+                action_type='media_updated',
+                additional_context={
+                    'media_id': product_media.id,
+                    'media_type': product_media.type
+                }
+            )
+        return previous_value
+
+    def product_media_deleted(self, product_media, previous_value=None, webhooks=None):
+        """Hook called when product media is deleted."""
+        if product_media.product:
+            self._track_product_action(
+                product=product_media.product,
+                action_type='media_deleted',
+                additional_context={
+                    'media_id': product_media.id,
+                    'media_type': product_media.type
+                }
+            )
+        return previous_value
+
+    # Utility methods for querying user associations
+    def get_user_created_products(self, user):
+        """Get all products created by a specific user."""
+        return ProductUserAssociation.get_user_products(user, action_type='created')
+
+    def get_product_creator(self, product):
+        """Get the user who created a specific product."""
+        return ProductUserAssociation.get_product_creator(product)
+
+    def get_product_activity_history(self, product):
+        """Get the complete activity history for a product."""
+        return ProductUserAssociation.get_product_history(product)
