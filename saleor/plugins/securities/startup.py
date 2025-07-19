@@ -40,8 +40,8 @@ def initialize_tickers_data():
         ticker_count = Tickers.objects.count()
         logger.info(f"Current ticker count: {ticker_count}")
         
-        if ticker_count > 5000:
-            logger.info("Ticker count > 5000, skipping initialization")
+        if ticker_count > 10000:
+            logger.info("Ticker count > 10000, skipping initialization")
             return
         
         logger.info("Initializing tickers data from Polygon.io...")
@@ -107,7 +107,7 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
     tickers_data = []
     next_url = None
     request_count = 0
-    max_requests = 8  # Increased to cover more exchanges
+    max_requests = 15  # Increased to fetch ~15,000 tickers
     
     # Major US exchanges to ensure comprehensive coverage
     target_exchanges = [
@@ -205,7 +205,7 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                     
                 # Add delay to respect rate limits (free tier: 5 requests per minute)
                 import time
-                time.sleep(12)  # 12 seconds between requests = 5 requests per minute
+                time.sleep(8)   # 8 seconds between requests = 7.5 requests per minute
                 
             else:
                 logger.error(f"Invalid response from Polygon.io: {response}")
@@ -234,7 +234,7 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
     etf_data = []
     next_url = None
     request_count = 0
-    max_requests = 5  # Increased for better ETF coverage
+    max_requests = 10  # Increased for better ETF coverage
     
     # Major US exchanges for ETFs
     target_exchanges = [
@@ -319,7 +319,7 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                     
                 # Add delay to respect rate limits
                 import time
-                time.sleep(12)
+                time.sleep(8)   # 8 seconds between requests
                 
             else:
                 logger.error(f"Invalid ETF response from Polygon.io: {response}")
