@@ -117,13 +117,20 @@ class TradexPlugin(BasePlugin):
         }
 
     # Helper methods for user tracking
+    def _get_config_value(self, key: str, default=None):
+        """Get configuration value from the plugin configuration list."""
+        for item in self.configuration:
+            if item["name"] == key:
+                return item["value"]
+        return default
+
     def _should_track_actions(self):
         """Check if user action tracking is enabled."""
-        return self.configuration.get("track_user_actions", True)
+        return self._get_config_value("track_user_actions", True)
 
     def _should_track_ip(self):
         """Check if IP address tracking is enabled."""
-        return self.configuration.get("track_ip_addresses", False)
+        return self._get_config_value("track_ip_addresses", False)
 
     def _get_user_from_requestor(self):
         """Extract user from requestor, handling both User and App instances."""
