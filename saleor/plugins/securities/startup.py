@@ -170,7 +170,8 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                     valid_exchange = primary_exchange in target_exchanges
                     valid_market = market in ['stocks', 'otc', 'fx']  # Expanded market types
                     
-                    if valid_type and (valid_exchange or valid_market):
+                    # More lenient filtering - accept if valid type and either valid exchange OR valid market OR neither specified
+                    if valid_type and (valid_exchange or valid_market or not primary_exchange):
                         # Map different ETF types to 'etp'
                         mapped_type = 'cs' if ticker_type == 'CS' else 'etp'
                         
@@ -182,10 +183,9 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                             'active': ticker_data.get('active', True)
                         }
                         
-                        # Only add if ticker symbol is valid and from target exchanges
+                        # Only add if ticker symbol is valid
                         if (processed_ticker['ticker'] and 
-                            len(processed_ticker['ticker']) <= 10 and
-                            processed_ticker['exchange']):
+                            len(processed_ticker['ticker']) <= 10):
                             tickers_data.append(processed_ticker)
                             
                             # Log ETF finds for debugging
@@ -205,7 +205,7 @@ def fetch_us_stocks_and_etfs(polygon_client) -> List[Dict[str, Any]]:
                     
                 # Add delay to respect rate limits (free tier: 5 requests per minute)
                 import time
-                time.sleep(8)   # 8 seconds between requests = 7.5 requests per minute
+                time.sleep(1)   # 1 second between requests = 60 requests per minute
                 
             else:
                 logger.error(f"Invalid response from Polygon.io: {response}")
@@ -294,7 +294,8 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                     valid_exchange = primary_exchange in target_exchanges
                     valid_market = market in ['stocks', 'otc', 'fx']  # Expanded market types
                     
-                    if valid_type and (valid_exchange or valid_market):
+                    # More lenient filtering for ETFs
+                    if valid_type and (valid_exchange or valid_market or not primary_exchange):
                         processed_ticker = {
                             'ticker': ticker_data.get('ticker', '').upper(),
                             'name': ticker_data.get('name', '')[:255],
@@ -303,10 +304,9 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                             'active': ticker_data.get('active', True)
                         }
                         
-                        # Only add if ticker symbol is valid and from target exchanges
+                        # Only add if ticker symbol is valid
                         if (processed_ticker['ticker'] and 
-                            len(processed_ticker['ticker']) <= 10 and
-                            processed_ticker['exchange']):
+                            len(processed_ticker['ticker']) <= 10):
                             etf_data.append(processed_ticker)
                             logger.debug(f"Found ETF: {processed_ticker['ticker']} from {primary_exchange}")
                 
@@ -319,7 +319,7 @@ def fetch_us_etfs_specifically(polygon_client) -> List[Dict[str, Any]]:
                     
                 # Add delay to respect rate limits
                 import time
-                time.sleep(8)   # 8 seconds between requests
+                time.sleep(1)   # 1 second between requests
                 
             else:
                 logger.error(f"Invalid ETF response from Polygon.io: {response}")

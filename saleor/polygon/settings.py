@@ -19,8 +19,8 @@ POLYGON_CACHE_SETTINGS = {
 
 # Rate limiting settings
 POLYGON_RATE_LIMIT = {
-    'REQUESTS_PER_MINUTE': 5,    # Free tier limit
-    'REQUESTS_PER_DAY': 1000,    # Free tier limit
+    'REQUESTS_PER_MINUTE': 100,  # Increased for paid tier
+    'REQUESTS_PER_DAY': 50000,   # Increased for paid tier
     'ENABLE_RATE_LIMITING': True
 }
 
@@ -89,8 +89,8 @@ DEFAULT_POLYGON_SETTINGS = {
         'DEFAULT_CACHE_TIMEOUT': 300
     },
     'POLYGON_RATE_LIMIT': {
-        'REQUESTS_PER_MINUTE': 5,
-        'REQUESTS_PER_DAY': 1000,
+        'REQUESTS_PER_MINUTE': 100,
+        'REQUESTS_PER_DAY': 50000,
         'ENABLE_RATE_LIMITING': True
     },
     'POLYGON_DATA_RETENTION': {
