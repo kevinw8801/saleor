@@ -201,6 +201,44 @@ def get_portfolio_product_type_config():
                     {"slug": "high", "name": "High Risk"},
                     {"slug": "very-high", "name": "Very High Risk"},
                 ]
+            },
+            {
+                "slug": "frequency",
+                "name": "Frequency",
+                "type": "product-type",  # AttributeType.PRODUCT_TYPE
+                "input_type": "dropdown",  # AttributeInputType.DROPDOWN
+                "value_required": False,
+                "visible_in_storefront": True,
+                "filterable_in_storefront": True,
+                "filterable_in_dashboard": True,
+                "values": [
+                    {"slug": "daily", "name": "Daily"},
+                    {"slug": "weekly", "name": "Weekly"},
+                    {"slug": "monthly", "name": "Monthly"},
+                    {"slug": "quarterly", "name": "Quarterly"},
+                    {"slug": "yearly", "name": "Yearly"},
+                ]
+            },
+            {
+                "slug": "auto-renew",
+                "name": "Auto Renew",
+                "type": "product-type",  # AttributeType.PRODUCT_TYPE
+                "input_type": "boolean",  # AttributeInputType.BOOLEAN
+                "value_required": False,
+                "visible_in_storefront": True,
+                "filterable_in_storefront": True,
+                "filterable_in_dashboard": True,
+                "values": []  # Boolean attributes don't need predefined values
+            },
+            {
+                "slug": "trial-period-days",
+                "name": "Trial Period Days",
+                "type": "product-type",  # AttributeType.PRODUCT_TYPE
+                "input_type": "numeric",  # AttributeInputType.NUMERIC
+                "value_required": False,
+                "visible_in_storefront": True,
+                "filterable_in_dashboard": True,
+                "values": []  # Numeric attributes don't need predefined values
             }
         ]
     }

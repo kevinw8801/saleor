@@ -183,6 +183,60 @@ class Command(BaseCommand):
                     slug=slug,
                 )
 
+            # Create subscription attributes (from utility product type)
+            self.stdout.write('Creating subscription attributes...')
+            
+            # Frequency attribute
+            frequency_attr = Attribute.objects.create(
+                slug="frequency",
+                name="Frequency",
+                type=AttributeType.PRODUCT_TYPE,
+                input_type=AttributeInputType.DROPDOWN,
+                value_required=False,
+                visible_in_storefront=True,
+                filterable_in_storefront=True,
+                filterable_in_dashboard=True,
+            )
+
+            # Create frequency values
+            frequencies = [
+                ("daily", "Daily"),
+                ("weekly", "Weekly"),
+                ("monthly", "Monthly"),
+                ("quarterly", "Quarterly"),
+                ("yearly", "Yearly"),
+            ]
+            
+            for slug, name in frequencies:
+                AttributeValue.objects.create(
+                    attribute=frequency_attr,
+                    name=name,
+                    slug=slug,
+                )
+
+            # Auto-renew attribute
+            auto_renew_attr = Attribute.objects.create(
+                slug="auto-renew",
+                name="Auto Renew",
+                type=AttributeType.PRODUCT_TYPE,
+                input_type=AttributeInputType.BOOLEAN,
+                value_required=False,
+                visible_in_storefront=True,
+                filterable_in_storefront=True,
+                filterable_in_dashboard=True,
+            )
+
+            # Trial period days attribute
+            trial_period_attr = Attribute.objects.create(
+                slug="trial-period-days",
+                name="Trial Period Days",
+                type=AttributeType.PRODUCT_TYPE,
+                input_type=AttributeInputType.NUMERIC,
+                value_required=False,
+                visible_in_storefront=True,
+                filterable_in_dashboard=True,
+            )
+
             # Assign attributes to the product type
             self.stdout.write('Assigning attributes to Portfolio product type...')
             portfolio_product_type.product_attributes.add(
@@ -193,6 +247,9 @@ class Command(BaseCommand):
                 base_currency_attr,
                 cash_attr,
                 risk_level_attr,
+                frequency_attr,
+                auto_renew_attr,
+                trial_period_attr,
             )
 
             self.stdout.write(
