@@ -25,6 +25,7 @@ class TradexPlugin(BasePlugin):
         {"name": "auto_setup_portfolio_type", "value": True},
         {"name": "track_user_actions", "value": True},
         {"name": "track_ip_addresses", "value": False},
+        {"name": "default_portfolio_balance", "value": "10000"},
     ]
 
     CONFIG_STRUCTURE = {
@@ -67,6 +68,11 @@ class TradexPlugin(BasePlugin):
             "type": ConfigurationTypeField.BOOLEAN,
             "help_text": "Track IP addresses of users performing actions",
             "label": "Track IP Addresses",
+        },
+        "default_portfolio_balance": {
+            "type": ConfigurationTypeField.STRING,
+            "help_text": "Default cash balance for new portfolios (in base currency)",
+            "label": "Default Portfolio Balance",
         },
     }
 
@@ -132,6 +138,15 @@ class TradexPlugin(BasePlugin):
         """Check if IP address tracking is enabled."""
         return self._get_config_value("track_ip_addresses", False)
 
+    def _get_default_portfolio_balance(self):
+        """Get the default portfolio balance from configuration."""
+        balance_str = self._get_config_value("default_portfolio_balance", "10000")
+        try:
+            return float(balance_str)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid default_portfolio_balance value: {balance_str}, using 10000")
+            return 10000.0
+
     def _get_user_from_requestor(self):
         """Extract user from requestor, handling both User and App instances."""
         if not self.requestor:
@@ -196,9 +211,56 @@ class TradexPlugin(BasePlugin):
         except Exception as e:
             logger.error(f"Error tracking product action: {e}")
 
+    def _set_default_portfolio_cash_balance(self, product):
+        """Set default cash balance for portfolio products."""
+        try:
+            # Check if this is a portfolio product
+            if product.product_type and product.product_type.slug == 'portfolio':
+                from ...attribute.models import Attribute, AttributeValue
+                from ...attribute.utils import associate_attribute_values_to_instance
+                from django.db import transaction
+                
+                # Get the cash attribute
+                try:
+                    cash_attribute = Attribute.objects.get(slug='cash')
+                except Attribute.DoesNotExist:
+                    logger.warning("Cash attribute not found for portfolio product")
+                    return
+                
+                # Check if cash balance is already set for this product
+                existing_values = product.attributes.filter(
+                    assignment__attribute=cash_attribute
+                ).exists()
+                
+                if not existing_values:
+                    # Set default cash balance
+                    default_balance = self._get_default_portfolio_balance()
+                    
+                    with transaction.atomic():
+                        # Create the attribute value for this product
+                        cash_value = AttributeValue.objects.create(
+                            attribute=cash_attribute,
+                            name=str(default_balance),
+                            slug=f"{product.id}_{cash_attribute.id}",
+                        )
+                        
+                        # Associate the value with the product
+                        associate_attribute_values_to_instance(
+                            product, 
+                            {cash_attribute.id: [cash_value]}
+                        )
+                        
+                        logger.info(f"Set default cash balance {default_balance} for portfolio product {product.id}")
+        except Exception as e:
+            logger.error(f"Error setting default portfolio cash balance: {e}")
+
     # Plugin hook methods for product tracking
     def product_created(self, product, previous_value=None, webhooks=None):
         """Hook called when a product is created."""
+        # Set default cash balance for portfolio products
+        self._set_default_portfolio_cash_balance(product)
+        
+        # Track the product creation
         self._track_product_action(
             product=product,
             action_type='created',

@@ -61,7 +61,7 @@ class PolygonIOClient:
         cache_key = f"polygon_stock_quote_{symbol}"
         
         def fetch():
-            endpoint = f"/v2/last/nbbo/{symbol}"
+            endpoint = f"/v2/last/trade/{symbol}"
             return self._make_request(endpoint)
         
         return self._get_cached_or_fetch(cache_key, fetch, cache_timeout=60)
