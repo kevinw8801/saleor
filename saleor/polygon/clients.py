@@ -57,12 +57,23 @@ class PolygonIOClient:
     
     # Stock Data Methods
     def get_stock_quote(self, symbol: str) -> Dict[str, Any]:
-        """Get real-time stock quote"""
+        """Get stock quote (real-time if available, historical as fallback)"""
         cache_key = f"polygon_stock_quote_{symbol}"
         
         def fetch():
-            endpoint = f"/v2/last/trade/{symbol}"
-            return self._make_request(endpoint)
+            # Try real-time first, fallback to historical if 403
+            try:
+                endpoint = f"/v2/last/trade/{symbol}"
+                return self._make_request(endpoint)
+            except Exception as e:
+                if "403" in str(e) or "Forbidden" in str(e):
+                    # Fallback to historical data for free tier
+                    from datetime import datetime, timedelta
+                    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+                    endpoint = f"/v2/aggs/ticker/{symbol}/range/1/day/{yesterday}/{yesterday}"
+                    return self._make_request(endpoint)
+                else:
+                    raise e
         
         return self._get_cached_or_fetch(cache_key, fetch, cache_timeout=60)
     
