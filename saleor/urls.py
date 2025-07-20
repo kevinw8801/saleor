@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.staticfiles.views import serve
-from django.urls import re_path
+from django.urls import include, re_path
 from django.views.decorators.csrf import csrf_exempt
 
 from .core.views import jwks
@@ -51,6 +51,8 @@ urlpatterns = [
         name="thumbnail",
     ),
     re_path(r"^\.well-known/jwks.json$", jwks, name="jwks"),
+    # Polygon app URLs for financial data API
+    re_path(r"^polygon/", include("saleor.polygon.urls")),
 ]
 
 if settings.DEBUG:
