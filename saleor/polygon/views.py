@@ -53,16 +53,22 @@ class PolygonWebhookView(View):
 
 def _get_polygon_client():
     """Get cached Polygon.io client instance"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not hasattr(_get_polygon_client, '_client'):
         try:
             api_key = getattr(settings, 'POLYGON_IO_API_KEY', None)
             if not api_key:
+                logger.error("POLYGON_IO_API_KEY not configured in settings")
                 raise ValueError("POLYGON_IO_API_KEY not configured in settings")
             
             polygon_client = PolygonIOClient(api_key)
             cache_manager = PolygonCacheManager()
             _get_polygon_client._client = CachedPolygonClient(polygon_client, cache_manager)
+            logger.info("Polygon.io client initialized successfully")
         except Exception as e:
+            logger.error(f"Failed to initialize Polygon.io client: {e}", exc_info=True)
             return None
     
     return _get_polygon_client._client
@@ -70,10 +76,37 @@ def _get_polygon_client():
 
 def _handle_api_error(e):
     """Handle API errors and return appropriate response"""
-    return JsonResponse({
-        'success': False,
-        'error': str(e)
-    }, status=500)
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    error_message = str(e)
+    logger.error(f"Polygon API error: {error_message}", exc_info=True)
+    
+    # Check for specific error types
+    if "404" in error_message or "Not Found" in error_message:
+        return JsonResponse({
+            'success': False,
+            'error': 'Symbol not found or invalid',
+            'details': error_message
+        }, status=404)
+    elif "429" in error_message or "rate limit" in error_message.lower():
+        return JsonResponse({
+            'success': False,
+            'error': 'Rate limit exceeded. Please try again later.',
+            'details': error_message
+        }, status=429)
+    elif "401" in error_message or "unauthorized" in error_message.lower():
+        return JsonResponse({
+            'success': False,
+            'error': 'API key invalid or expired',
+            'details': error_message
+        }, status=401)
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': 'Internal server error',
+            'details': error_message
+        }, status=500)
 
 
 # Stock API endpoints

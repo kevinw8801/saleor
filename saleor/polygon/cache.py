@@ -55,6 +55,10 @@ class PolygonCacheManager:
                 db_cache.delete()
         except MarketDataCache.DoesNotExist:
             pass
+        except Exception as e:
+            # Handle any other database errors silently
+            import logging
+            logging.getLogger(__name__).warning(f"Database cache error: {e}")
         
         return None
     
@@ -69,18 +73,27 @@ class PolygonCacheManager:
         self.redis_cache.set(cache_key, data, timeout)
         
         # Set in database cache (for persistence)
-        MarketDataCache.objects.update_or_create(
-            cache_key=cache_key,
-            defaults={
-                'data': data,
-                'expires_at': expires_at
-            }
-        )
+        try:
+            MarketDataCache.objects.update_or_create(
+                cache_key=cache_key,
+                defaults={
+                    'data': data,
+                    'expires_at': expires_at
+                }
+            )
+        except Exception as e:
+            # Log database errors but don't fail the cache operation
+            import logging
+            logging.getLogger(__name__).warning(f"Database cache set error: {e}")
     
     def invalidate(self, cache_key: str) -> None:
         """Remove data from both caches"""
         self.redis_cache.delete(cache_key)
-        MarketDataCache.objects.filter(cache_key=cache_key).delete()
+        try:
+            MarketDataCache.objects.filter(cache_key=cache_key).delete()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Database cache invalidate error: {e}")
     
     def clear_expired(self) -> int:
         """Clear all expired cache entries from database"""
