@@ -49,6 +49,10 @@ from .warehouse.schema import (
 from .webhook.schema import WebhookMutations, WebhookQueries
 from .webhook.subscription_types import WEBHOOK_TYPES_MAP, Subscription
 
+# TradEx plugin GraphQL schema
+from ..plugins.tradex.mutations import TradexMutations
+from ..plugins.tradex.queries import TradexQueries
+
 API_PATH = SimpleLazyObject(lambda: reverse("api"))
 
 
@@ -72,6 +76,7 @@ class Query(
     ShopQueries,
     StockQueries,
     TaxQueries,
+    TradexQueries,
     TranslationQueries,
     WarehouseQueries,
     WebhookQueries,
@@ -102,6 +107,7 @@ class Mutation(
     ShopMutations,
     StockMutations,
     TaxMutations,
+    TradexMutations,
     WarehouseMutations,
     WebhookMutations,
 ):
