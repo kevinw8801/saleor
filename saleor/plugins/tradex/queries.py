@@ -5,7 +5,7 @@ import graphene
 from graphene import relay
 from graphene_django.filter import DjangoFilterConnectionField
 
-from ...core.types import FilterInputObjectType
+from ...graphql.core.types import FilterInputObjectType
 from .models import Operation, Holding
 from .types import OperationType, HoldingType
 

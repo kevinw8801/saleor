@@ -7,8 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from ...graphql.core.mutations import BaseMutation
-from ...core.types import NonNullList
-from ...core.utils import from_global_id_or_error
+from ...graphql.core.types import NonNullList
+from ...graphql.core.utils import from_global_id_or_error
 from .models import Operation, Holding
 from .types import (
     OperationType, HoldingType, OperationInput, HoldingInput,
