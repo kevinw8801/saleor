@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from ...core.mutations import BaseMutation
+from ...graphql.core.mutations import BaseMutation
 from ...core.types import NonNullList
 from ...core.utils import from_global_id_or_error
 from .models import Operation, Holding
