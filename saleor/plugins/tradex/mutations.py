@@ -8,6 +8,7 @@ from django.db import transaction
 
 from ...graphql.core.mutations import BaseMutation
 from ...graphql.core.types import NonNullList
+from ...graphql.core.types.common import ProductError
 from ...graphql.core.utils import from_global_id_or_error
 from .models import Operation, Holding
 from .types import (
@@ -26,6 +27,8 @@ class OperationCreate(BaseMutation):
     
     class Meta:
         description = "Create a new trading operation."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def clean_input(cls, info, instance, data):
@@ -77,6 +80,8 @@ class OperationUpdate(BaseMutation):
     
     class Meta:
         description = "Update an existing trading operation."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def clean_input(cls, info, instance, data):
@@ -134,6 +139,8 @@ class OperationDelete(BaseMutation):
     
     class Meta:
         description = "Delete a trading operation."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def perform_mutation(cls, _root, info, **data):
@@ -161,6 +168,8 @@ class HoldingCreate(BaseMutation):
     
     class Meta:
         description = "Create a new portfolio holding."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def clean_input(cls, info, instance, data):
@@ -219,6 +228,8 @@ class HoldingUpdate(BaseMutation):
     
     class Meta:
         description = "Update an existing portfolio holding."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def clean_input(cls, info, instance, data):
@@ -278,6 +289,8 @@ class HoldingDelete(BaseMutation):
     
     class Meta:
         description = "Delete a portfolio holding."
+        error_type_class = ProductError
+        error_type_field = "product_errors"
     
     @classmethod
     def perform_mutation(cls, _root, info, **data):
