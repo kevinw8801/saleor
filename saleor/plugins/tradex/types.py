@@ -5,7 +5,7 @@ import graphene
 from graphene import relay
 
 from ...graphql.core.types import BaseObjectType
-from ...graphql.core.scalars import DateTime
+from ...graphql.core.scalars import DateTime, Decimal
 from .models import Operation, Holding
 
 
@@ -18,16 +18,16 @@ class OperationType(BaseObjectType):
     equity_id = graphene.String(description="Equity identifier")
     equity_name = graphene.String(description="Human-readable name of the equity")
     market = graphene.String(description="Market or exchange")
-    amount = graphene.Decimal(description="Amount or quantity")
-    fee = graphene.Decimal(description="Fee charged for the operation")
+    amount = Decimal(description="Amount or quantity")
+    fee = Decimal(description="Fee charged for the operation")
     currency = graphene.String(description="Currency code")
-    price = graphene.Decimal(description="Price per unit")
+    price = Decimal(description="Price per unit")
     status = graphene.String(description="Status of the operation")
     created_at = DateTime(description="Creation timestamp")
     updated_at = DateTime(description="Last update timestamp")
     
-    total_value = graphene.Decimal(description="Total value including fees")
-    net_value = graphene.Decimal(description="Net value excluding fees")
+    total_value = Decimal(description="Total value including fees")
+    net_value = Decimal(description="Net value excluding fees")
 
     def resolve_total_value(self, info):
         """Resolve total value including fees."""
@@ -45,13 +45,13 @@ class HoldingType(BaseObjectType):
     equity_id = graphene.String(description="Equity identifier")
     equity_name = graphene.String(description="Human-readable name of the equity")
     market = graphene.String(description="Market or exchange")
-    shares = graphene.Decimal(description="Number of shares held")
-    avg_price = graphene.Decimal(description="Average price per share")
+    shares = Decimal(description="Number of shares held")
+    avg_price = Decimal(description="Average price per share")
     currency = graphene.String(description="Currency code")
     created_at = DateTime(description="Creation timestamp")
     updated_at = DateTime(description="Last update timestamp")
     
-    total_value = graphene.Decimal(description="Total value of the holding")
+    total_value = Decimal(description="Total value of the holding")
     
     def resolve_total_value(self, info):
         """Resolve total value of the holding."""
@@ -66,10 +66,10 @@ class OperationInput(graphene.InputObjectType):
     equity_id = graphene.String(required=True)
     equity_name = graphene.String(required=True)
     market = graphene.String(required=True)
-    amount = graphene.Decimal(required=True)
-    fee = graphene.Decimal(required=True)
+    amount = Decimal(required=True)
+    fee = Decimal(required=True)
     currency = graphene.String(required=True)
-    price = graphene.Decimal(required=True)
+    price = Decimal(required=True)
     status = graphene.String(required=True)
 
 
@@ -80,10 +80,10 @@ class OperationUpdateInput(graphene.InputObjectType):
     equity_id = graphene.String()
     equity_name = graphene.String()
     market = graphene.String()
-    amount = graphene.Decimal()
-    fee = graphene.Decimal()
+    amount = Decimal()
+    fee = Decimal()
     currency = graphene.String()
-    price = graphene.Decimal()
+    price = Decimal()
     status = graphene.String()
 
 
@@ -92,8 +92,8 @@ class HoldingInput(graphene.InputObjectType):
     equity_id = graphene.String(required=True)
     equity_name = graphene.String(required=True)
     market = graphene.String(required=True)
-    shares = graphene.Decimal(required=True)
-    avg_price = graphene.Decimal(required=True)
+    shares = Decimal(required=True)
+    avg_price = Decimal(required=True)
     currency = graphene.String(required=True)
 
 
@@ -102,6 +102,6 @@ class HoldingUpdateInput(graphene.InputObjectType):
     equity_id = graphene.String()
     equity_name = graphene.String()
     market = graphene.String()
-    shares = graphene.Decimal()
-    avg_price = graphene.Decimal()
+    shares = Decimal()
+    avg_price = Decimal()
     currency = graphene.String()
