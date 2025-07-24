@@ -42,11 +42,10 @@ class HoldingType(BaseObjectType):
     """GraphQL type for Holding model."""
     
     id = graphene.ID()
-    equity_id = graphene.String(description="Equity identifier")
-    equity_name = graphene.String(description="Human-readable name of the equity")
+    amount = graphene.Int(description="Amount or quantity of the holding")
+    purchase_price = Decimal(description="Purchase price per unit")
+    purchase_time = DateTime(description="Date and time when the holding was purchased")
     market = graphene.String(description="Market or exchange")
-    shares = Decimal(description="Number of shares held")
-    avg_price = Decimal(description="Average price per share")
     currency = graphene.String(description="Currency code")
     created_at = DateTime(description="Creation timestamp")
     updated_at = DateTime(description="Last update timestamp")
@@ -89,19 +88,18 @@ class OperationUpdateInput(graphene.InputObjectType):
 
 class HoldingInput(graphene.InputObjectType):
     """Input type for creating holdings."""
-    equity_id = graphene.String(required=True)
-    equity_name = graphene.String(required=True)
+    id = graphene.String(required=True)
+    amount = graphene.Int(required=True)
+    purchase_price = Decimal(required=True)
+    purchase_time = DateTime(required=True)
     market = graphene.String(required=True)
-    shares = Decimal(required=True)
-    avg_price = Decimal(required=True)
     currency = graphene.String(required=True)
 
 
 class HoldingUpdateInput(graphene.InputObjectType):
     """Input type for updating holdings."""
-    equity_id = graphene.String()
-    equity_name = graphene.String()
+    amount = graphene.Int()
+    purchase_price = Decimal()
+    purchase_time = DateTime()
     market = graphene.String()
-    shares = Decimal()
-    avg_price = Decimal()
     currency = graphene.String()
