@@ -198,10 +198,14 @@ class HoldingCreate(BaseMutation):
                 raise ValidationError("Currency must be a 3-character ISO 4217 code")
             cleaned_input['currency'] = currency
         
+        # Generate ID if not provided
+        if 'id' not in cleaned_input or not cleaned_input['id']:
+            import uuid
+            cleaned_input['id'] = str(uuid.uuid4())
+        
         # Check if holding ID already exists
-        if 'id' in cleaned_input:
-            if Holding.objects.filter(id=cleaned_input['id']).exists():
-                raise ValidationError("Holding with this ID already exists")
+        if Holding.objects.filter(id=cleaned_input['id']).exists():
+            raise ValidationError("Holding with this ID already exists")
         
         return cleaned_input
     

@@ -88,7 +88,7 @@ class OperationUpdateInput(graphene.InputObjectType):
 
 class HoldingInput(graphene.InputObjectType):
     """Input type for creating holdings."""
-    id = graphene.String(required=True)
+    id = graphene.String(required=False)
     amount = graphene.Int(required=True)
     purchase_price = Decimal(required=True)
     purchase_time = DateTime(required=True)
